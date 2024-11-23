@@ -360,9 +360,6 @@ class Switchbot:
         """
         デバイスのリストを取得し、辞書として返します.
 
-        Todo:
-            print -> logging
-
         Returns:
             SwitchbotResponseDevices: デバイスのリストを含む辞書(SwitchBotAPIのレスポンス)
 
