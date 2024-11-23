@@ -1,0 +1,16 @@
+FROM python:3.13-alpine3.20
+
+RUN apk add --no-cache \
+    tzdata \
+  && cp /usr/share/zoneinfo/Asia/Tokyo /etc/localtime \
+  && echo "Asia/Tokyo" > /etc/timezone \
+  && pip install --no-cache-dir poetry==1.8.*
+
+WORKDIR /app
+COPY pyproject.toml ./pyproject.toml
+COPY poetry.lock ./poetry.lock
+RUN poetry install --without=dev \
+  && rm ./poetry.lock
+COPY src ./
+
+CMD poetry run gunicorn -w 4 -b 0.0.0.0:9171 --timeout 180 --chdir /app app:app
