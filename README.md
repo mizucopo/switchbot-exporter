@@ -5,6 +5,14 @@ Switchbot のステータスを取得します。
 
 ## 利用方法
 
+1. docker image を pull する
+
+```sh
+docker pull mizucopo/switchbot-exporter:latest
+```
+
+2. docker コンテナを立ち上げる
+
 ```sh
 docker run --rm -d \
   -p 9171:9171 \
@@ -21,9 +29,6 @@ docker run --rm -d \
 | CACHE_DIR |  | キャッシュファイルを保存するディレクトリ。デフォルトは /tmp/switchbot |
 | CACHE_EXPIRE_SECOND |  | キャッシュの有効期限（秒）。デフォルトは 600 |
 | DELAY_SECOND |  | APIリクエスト間の遅延時間（秒）。デフォルトは 1 |
-
-> [!NOTE]
-> 利用方法についてはまだ記載が終わっておりません
 
 ## 開発手順
 
