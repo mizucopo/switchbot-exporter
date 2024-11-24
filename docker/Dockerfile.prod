@@ -21,4 +21,4 @@ RUN pip install --no-cache-dir poetry==1.8.* \
   && poetry install --without=dev \
   && rm ./poetry.lock
 
-CMD poetry run gunicorn -w 4 -b 0.0.0.0:9171 --timeout 180 --chdir /app app:app
+CMD ["poetry", "run", "gunicorn", "-w", "4", "-b", "0.0.0.0:9171", "--timeout", "180", "--chdir", "/app", "app:app"]
