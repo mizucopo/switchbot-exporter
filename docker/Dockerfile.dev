@@ -1,0 +1,7 @@
+FROM mizucopo/switchbot-exporter:latest
+
+WORKDIR /app
+COPY pyproject.toml poetry.lock ./
+RUN poetry install
+
+CMD /bin/sh
