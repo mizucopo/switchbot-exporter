@@ -68,7 +68,7 @@ poetry run ruff check ./src
 poetry run black ./src ./tests
 ```
 
-6. Github へプルリクエストを行います
+6. GitHub へプルリクエストを行います
 
 ## Contact
 
