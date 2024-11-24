@@ -29,13 +29,15 @@ docker run --rm -d \
 
 開発環境は docker コンテナになります
 
-1. docker image のビルドを行います
+1. secrets.example を複製し、ファイル名を .secrets に変更します
+2. .secrets を編集します
+3. docker image のビルドを行います
 
 ```sh
 docker compose build
 ```
 
-2. docker コンテナを立ち上げます
+5. docker コンテナを立ち上げます
 
 ```sh
 docker run --rm -it \
@@ -47,14 +49,14 @@ docker run --rm -it \
   /bin/sh
 ```
 
-3. ソースコードを編集します
-4. テストの実行をします
+6. ソースコードを編集します
+7. テストの実行をします
 
 ```sh
 poetry run pytest ./tests
 ```
 
-5. フォーマットの確認をします
+8. フォーマットの確認をします
 
 ```sh
 poetry run mypy --pretty ./src
@@ -68,7 +70,13 @@ poetry run ruff check ./src
 poetry run black ./src ./tests
 ```
 
-6. GitHub へプルリクエストを行います
+9. ビルドテストを実行します
+
+```sh
+act -j build-and-push
+```
+
+10. GitHub へプルリクエストを行います
 
 ## Contact
 
