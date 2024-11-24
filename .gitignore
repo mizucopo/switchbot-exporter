@@ -118,3 +118,7 @@ __pypackages__/
 
 
 # End of https://www.toptal.com/developers/gitignore/api/pythonvanilla,macos,linux
+
+
+# Original Additions
+.secrets
