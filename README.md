@@ -34,6 +34,8 @@ docker run --rm -d \
 
 開発環境は docker コンテナになります
 
+ [コントリビューションガイド (AGENTS.md)](./AGENTS.md) および [日本語版 (AGENTS.ja.md)](./AGENTS.ja.md) も併せて参照してください。
+
 1. secrets.example を複製し、ファイル名を .secrets に変更します
 2. .secrets を編集します
 3. docker image のビルドを行います
