@@ -18,7 +18,7 @@ COPY pyproject.toml uv.lock ./
 COPY src ./
 
 RUN pip install --no-cache-dir uv \
-  && uv pip install --system --no-deps --requirement uv.lock \
+  && uv sync --frozen \
   && rm -rf /root/.cache/uv
 
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:9171", "--timeout", "180", "--chdir", "/app", "app:app"]
+CMD [".venv/bin/gunicorn", "-w", "4", "-b", "0.0.0.0:9171", "--timeout", "180", "--chdir", "/app", "app:app"]

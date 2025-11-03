@@ -44,7 +44,6 @@ Switchbot Exporter のローカル開発は uv が管理する Python 仮想環�
 ### セットアップ
 
 ```sh
-cd docker
 uv venv .venv
 source .venv/bin/activate
 uv pip sync uv.lock uv.dev.lock
@@ -54,8 +53,8 @@ uv pip sync uv.lock uv.dev.lock
 python-decouple が自動的に `.env` ファイルを読み込むため、手動での環境変数読み込みは不要です。
 
 ```sh
-cp ../env.example ../.env
-# ../.env を編集して実際の値を設定
+cp env.example .env
+# .env を編集して実際の値を設定
 ```
 
 `.env` ファイルはプロジェクトルートに配置することで、自動的に読み込まれます。
@@ -76,7 +75,7 @@ uv 仮想環境を利用していれば `poetry run` や Docker 特有のボリ�
 Docker での動作確認が必要な場合は `Dockerfile` を用いてコンテナをビルドできます。配布時と同じパッケージング形態で検証することを意図しています。
 
 ```sh
-docker build -f docker/Dockerfile -t switchbot-exporter:local ./docker
+docker build -f Dockerfile -t switchbot-exporter:local .
 docker run --rm -d \
   -p 9171:9171 \
   -e SWITCHBOT_API_TOKEN=test_api_token \
