@@ -75,7 +75,7 @@ def generate_prometheus_response_text(metrics: SwitchbotMetrics) -> str:
 
 
 # python-decouple を使用して環境変数を取得
-# .env ファイルはプロジェクトルート（docker/ の親ディレクトリ）を検索
+# .env ファイルはプロジェクトルートを検索
 SWITCHBOT_API_TOKEN = get_required_env_var("SWITCHBOT_API_TOKEN")
 SWITCHBOT_API_SECRET = get_required_env_var("SWITCHBOT_API_SECRET")
 SERVER_PORT: int = get_optional_env_var("SERVER_PORT", 9171, int)  # type: ignore

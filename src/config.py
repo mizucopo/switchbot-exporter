@@ -9,7 +9,7 @@ from typing import Type
 
 from decouple import AutoConfig, UndefinedValueError
 
-# プロジェクトルート（docker/ の親ディレクトリ）を検索パスとして設定
+# プロジェクトルートを検索パスとして設定
 search_path = Path(__file__).parent.parent
 app_config = AutoConfig(search_path=search_path)
 
