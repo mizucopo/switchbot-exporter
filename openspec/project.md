@@ -34,7 +34,7 @@ SwitchBot デバイスの状態を Prometheus メトリクスとして公開し�
 ## ドメインコンテキスト
 - SwitchBot のデバイス群（ボット、センサー、加湿器など）を対象とし、公式 API を通じて状態を取得する。
 - メトリクスは可用性（オンライン/オフライン）、バッテリー残量、環境データ（温度、湿度、照度）を優先する。
-- `SWITCHBOT_API_TOKEN` と `SWITCHBOT_API_SECRET` などのシークレットはバージョン管理外に置き、サンプル設定は `secrets.example` に提供する。
+- `SWITCHBOT_API_TOKEN` と `SWITCHBOT_API_SECRET` などのシークレットはバージョン管理外に置き、サンプル設定は `env.example` に提供する。
 
 ## 重要な制約
 - SwitchBot API にはレート制限があるため、デフォルトの遅延（`DELAY_SECOND`）やキャッシュ有効期限（`CACHE_EXPIRE_SECOND`）は設定可能な状態で維持する。

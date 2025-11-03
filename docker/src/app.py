@@ -4,32 +4,11 @@ Prometheusカスタムエクスポーターを提供します.
 メインのエントリポイントとして、CLIで起動できる `exporter` 関数を含んでいます。
 """
 
-import os
-
 import click
 from flask import Flask, Response
 
+from config import get_optional_env_var, get_required_env_var
 from switchbot import Switchbot, SwitchbotMetrics
-
-
-def get_required_env_var(name: str) -> str:
-    """
-    必須の環境変数を取得します.
-
-    Args:
-        name (str): 環境変数名。
-
-    Returns:
-        str: 環境変数の値。
-
-    Raises:
-        ValueError: 必須の環境変数が設定されていない場合
-
-    """
-    value = os.getenv(name)
-    if value is None:
-        raise ValueError(f"必須の環境変数 '{name}' が設定されていません。")
-    return value
 
 
 def generate_prometheus_response_text(metrics: SwitchbotMetrics) -> str:
@@ -95,12 +74,14 @@ def generate_prometheus_response_text(metrics: SwitchbotMetrics) -> str:
     return response_text.strip()
 
 
+# python-decouple を使用して環境変数を取得
+# .env ファイルはプロジェクトルート（docker/ の親ディレクトリ）を検索
 SWITCHBOT_API_TOKEN = get_required_env_var("SWITCHBOT_API_TOKEN")
 SWITCHBOT_API_SECRET = get_required_env_var("SWITCHBOT_API_SECRET")
-SERVER_PORT = int(os.getenv("SERVER_PORT", 9171))
-CACHE_DIR = os.getenv("CACHE_DIR", "/tmp/switchbot")
-CACHE_EXPIRE_SECOND = int(os.getenv("CACHE_EXPIRE_SECOND", 600))
-DELAY_SECOND = float(os.getenv("DELAY_SECOND", 1))
+SERVER_PORT: int = get_optional_env_var("SERVER_PORT", 9171, int)  # type: ignore
+CACHE_DIR: str = get_optional_env_var("CACHE_DIR", "/tmp/switchbot", str)  # type: ignore
+CACHE_EXPIRE_SECOND: int = get_optional_env_var("CACHE_EXPIRE_SECOND", 600, int)  # type: ignore
+DELAY_SECOND: float = get_optional_env_var("DELAY_SECOND", 1, float)  # type: ignore
 
 app = Flask(__name__)
 switchbot = Switchbot(

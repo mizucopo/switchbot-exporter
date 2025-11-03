@@ -50,14 +50,15 @@ source .venv/bin/activate
 uv pip sync uv.lock uv.dev.lock
 ```
 
-必要なシークレットはリポジトリルートの `secrets.example` を `.secrets` にコピーして編集します。
-uv 仮想環境でコマンドを実行する前に、環境変数をロードしてください。
+必要な環境変数はリポジトリルートの `env.example` を `.env` にコピーして編集します。
+python-decouple が自動的に `.env` ファイルを読み込むため、手動での環境変数読み込みは不要です。
 
 ```sh
-set -a
-source ../.secrets
-set +a
+cp ../env.example ../.env
+# ../.env を編集して実際の値を設定
 ```
+
+`.env` ファイルはプロジェクトルートに配置することで、自動的に読み込まれます。
 
 ### 開発コマンド
 
