@@ -1,47 +1,47 @@
-# Project Context
+# プロジェクトコンテキスト
 
-## Purpose
-Expose SwitchBot device state as Prometheus metrics so that home-automation and monitoring stacks can track device health and environment data.
+## 目的
+SwitchBot デバイスの状態を Prometheus メトリクスとして公開し、ホームオートメーションや監視スタックがデバイスのヘルスや環境データを追跡できるようにする。
 
-## Tech Stack
-- Python 3.13 with Flask for the HTTP exporter.
-- uv-managed dependencies (`pyproject.toml` + `uv.lock`) covering `requests`, `prometheus_client`, `inflect/inflection`, `click`, and tooling.
-- Docker images as the primary distribution vehicle to keep host environments clean.
-- Prometheus server scraping the exporter endpoint.
+## 技術スタック
+- HTTP エクスポーターとして Flask を用いた Python 3.13。
+- uv で管理する依存関係（`pyproject.toml` + `uv.lock`）で `requests`、`prometheus_client`、`inflect/inflection`、`click` および開発ツール群をカバーする。
+- 既存環境を汚さないよう、配布は Docker イメージを主経路とする。
+- Prometheus サーバーがエクスポーターのエンドポイントをスクレイプする。
 
-## Project Conventions
+## プロジェクト規約
 
-### Code Style
-- Enforce Black (88 chars), Ruff, and strict Mypy before merge; keep modules type-annotated.
-- Follow repo conventions for module placement (`docker/src` mirrored by `docker/tests`) and snake_case naming.
-- Keep Prometheus metric names descriptive and stable (`switchbot_device_*` style).
+### コードスタイル
+- マージ前に Black（88 文字幅）、Ruff、strict Mypy を必ず通し、モジュールには型注釈を整える。
+- モジュール配置はリポジトリの慣例に従い（`docker/src` と `docker/tests` を対応させる）、命名は snake_case を守る。
+- Prometheus のメトリクス名は説明的で安定させる（`switchbot_device_*` 形式）。
 
-### Architecture Patterns
-- `docker/src/app.py` hosts the Flask exporter; `docker/src/switchbot.py` wraps the SwitchBot public API.
-- Ship functionality via Docker images to avoid polluting contributor environments; local work happens inside the dev container.
-- Keep caching/delay concerns close to the SwitchBot client so API usage remains centralized.
+### アーキテクチャパターン
+- `docker/src/app.py` が Flask エクスポーターを提供し、`docker/src/switchbot.py` が SwitchBot 公開 API をラップする。
+- 機能は Docker イメージとして提供し、開発者環境を汚さない。ローカル作業は開発用コンテナ内で行う。
+- キャッシュや遅延の制御は SwitchBot クライアントの近くに集約し、API 利用を一元化する。
 
-### Testing Strategy
-- Use pytest for unit tests under `docker/tests`, stubbing external SwitchBot calls.
-- Run `mypy --pretty ./src`, `ruff check ./src`, and `black ./src ./tests` (after installing dependencies via uv) as part of pre-merge checks.
-- End-to-end validation relies on Prometheus scrape tests in staging rather than automated integration tests today.
+### テスト戦略
+- `docker/tests` 配下で pytest によりユニットテストを行い、SwitchBot への外部呼び出しはスタブ化する。
+- マージ前のチェックとして `mypy --pretty ./src`、`ruff check ./src`、`black ./src ./tests` を（uv で依存関係を整えた上で）実行する。
+- 現状のエンドツーエンド検証は自動化された統合テストではなく、ステージング環境での Prometheus スクレイプテストに依存している。
 
-### Git Workflow
-- Conventional Commits (`fix:`, `feat:`, etc.) for history clarity.
-- Develop changes on feature branches; avoid direct pushes to default branches.
-- Validate with GitHub Actions workflow (`act -j build-and-push`) before opening PRs when practical.
+### Git ワークフロー
+- コミット履歴の明瞭化のため Conventional Commits（`fix:`、`feat:` 等）に従う。
+- 変更はフィーチャーブランチで行い、デフォルトブランチへ直接プッシュしない。
+- 可能な範囲で PR 前に GitHub Actions のワークフロー（`act -j build-and-push`）で検証する。
 
-## Domain Context
-- Targets SwitchBot device families (bots, sensors, humidifiers) exposed through the official API.
-- Metrics prioritize availability (online/offline), battery percentage, and environment readings (temperature, humidity, light).
-- Secrets (`SWITCHBOT_API_TOKEN`, `SWITCHBOT_API_SECRET`) remain out of version control; example configs live in `secrets.example`.
+## ドメインコンテキスト
+- SwitchBot のデバイス群（ボット、センサー、加湿器など）を対象とし、公式 API を通じて状態を取得する。
+- メトリクスは可用性（オンライン/オフライン）、バッテリー残量、環境データ（温度、湿度、照度）を優先する。
+- `SWITCHBOT_API_TOKEN` と `SWITCHBOT_API_SECRET` などのシークレットはバージョン管理外に置き、サンプル設定は `secrets.example` に提供する。
 
-## Important Constraints
-- SwitchBot API enforces rate limits; default delay (`DELAY_SECOND`) and caching (`CACHE_EXPIRE_SECOND`) settings must remain configurable.
-- Exporter requires write access to `CACHE_DIR` when caching is enabled; mounts must be writable inside containers.
-- Treat Docker images as the supported deployment path; bare-metal installs are out of scope.
+## 重要な制約
+- SwitchBot API にはレート制限があるため、デフォルトの遅延（`DELAY_SECOND`）やキャッシュ有効期限（`CACHE_EXPIRE_SECOND`）は設定可能な状態で維持する。
+- キャッシュを有効化する場合、エクスポーターは `CACHE_DIR` への書き込み権限を必要とするため、コンテナ内のマウント先は書き込み可能でなければならない。
+- デプロイは Docker イメージを前提とし、ベアメタルへの直接インストールはスコープ外とする。
 
-## External Dependencies
-- SwitchBot Public API for device state polling.
-- Prometheus (or compatible scrapers) consuming the `/metrics` endpoint.
-- GitHub Actions workflow for build-and-push automation.
+## 外部依存
+- SwitchBot 公開 API（デバイス状態の取得用）
+- Prometheus など `/metrics` エンドポイントをスクレイプできるシステム
+- ビルドとプッシュの自動化を担う GitHub Actions ワークフロー

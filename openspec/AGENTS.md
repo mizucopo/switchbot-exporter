@@ -1,178 +1,178 @@
-# OpenSpec Instructions
+# OpenSpec インストラクション
 
-Instructions for AI coding assistants using OpenSpec for spec-driven development.
+OpenSpec を用いて仕様駆動開発を進める AI コーディングアシスタントのための指針です。
 
-## TL;DR Quick Checklist
+## TL;DR クイックチェックリスト
 
-- Search existing work: `openspec spec list --long`, `openspec list` (use `rg` only for full-text search)
-- Decide scope: new capability vs modify existing capability
-- Pick a unique `change-id`: kebab-case, verb-led (`add-`, `update-`, `remove-`, `refactor-`)
-- Scaffold: `proposal.md`, `tasks.md`, `design.md` (only if needed), and delta specs per affected capability
-- Write deltas: use `## ADDED|MODIFIED|REMOVED|RENAMED Requirements`; include at least one `#### Scenario:` per requirement
-- Validate: `openspec validate [change-id] --strict` and fix issues
-- Request approval: Do not start implementation until proposal is approved
+- 既存の作業を検索: `openspec spec list --long`, `openspec list`（全文検索が必要なときだけ `rg` を使用）
+- スコープを判断: 新しいケイパビリティか、既存ケイパビリティの更新か
+- 一意な `change-id` を決める: ケバブケースで動詞始まり（`add-`, `update-`, `remove-`, `refactor-` など）
+- ひな形を準備: `proposal.md`、`tasks.md`、必要に応じて `design.md`、そして影響するケイパビリティごとの差分スペック
+- 差分を書く: `## ADDED|MODIFIED|REMOVED|RENAMED Requirements` を使い、各要件に最低 1 つ `#### Scenario:` を含める
+- バリデーション: `openspec validate [change-id] --strict` を実行し、問題を修正する
+- 承認の取得: 提案が承認されるまで実装を開始しない
 
-## Three-Stage Workflow
+## 3 段階ワークフロー
 
-### Stage 1: Creating Changes
-Create proposal when you need to:
-- Add features or functionality
-- Make breaking changes (API, schema)
-- Change architecture or patterns  
-- Optimize performance (changes behavior)
-- Update security patterns
+### ステージ 1: 変更の作成
+以下の場合に提案を作成する:
+- 機能や挙動を追加するとき
+- 破壊的変更を行うとき（API やスキーマなど）
+- アーキテクチャやパターンを変更するとき
+- パフォーマンスを向上させる（挙動が変わる）とき
+- セキュリティのパターンを更新するとき
 
-Triggers (examples):
-- "Help me create a change proposal"
-- "Help me plan a change"
-- "Help me create a proposal"
-- "I want to create a spec proposal"
-- "I want to create a spec"
+トリガー例:
+- 「変更提案を作りたい」
+- 「変更計画を手伝ってほしい」
+- 「提案をまとめたい」
+- 「仕様提案を作りたい」
+- 「仕様を作りたい」
 
-Loose matching guidance:
-- Contains one of: `proposal`, `change`, `spec`
-- With one of: `create`, `plan`, `make`, `start`, `help`
+ゆるい判定基準:
+- `proposal`、`change`、`spec` のいずれかを含む
+- かつ `create`、`plan`、`make`、`start`、`help` のいずれかを含む
 
-Skip proposal for:
-- Bug fixes (restore intended behavior)
-- Typos, formatting, comments
-- Dependency updates (non-breaking)
-- Configuration changes
-- Tests for existing behavior
+提案をスキップできるケース:
+- バグ修正（想定どおりの挙動に戻すだけ）
+- タイポ、整形、コメントのみ
+- 非破壊的な依存関係更新
+- 設定ファイルの変更
+- 既存挙動を検証するテストの追加
 
-**Workflow**
-1. Review `openspec/project.md`, `openspec list`, and `openspec list --specs` to understand current context.
-2. Choose a unique verb-led `change-id` and scaffold `proposal.md`, `tasks.md`, optional `design.md`, and spec deltas under `openspec/changes/<id>/`.
-3. Draft spec deltas using `## ADDED|MODIFIED|REMOVED Requirements` with at least one `#### Scenario:` per requirement.
-4. Run `openspec validate <id> --strict` and resolve any issues before sharing the proposal.
+**ワークフロー**
+1. 現在の状況を理解するために `openspec/project.md`、`openspec list`、`openspec list --specs` を確認する。
+2. 動詞始まりの一意な `change-id` を選び、`openspec/changes/<id>/` に `proposal.md`、`tasks.md`、必要なら `design.md` とスペック差分を用意する。
+3. 差分スペックでは各要件に最低 1 つの `#### Scenario:` を含めつつ `## ADDED|MODIFIED|REMOVED Requirements` を使って記述する。
+4. 提案を共有する前に `openspec validate <id> --strict` を実行し、すべての問題を解消する。
 
-### Stage 2: Implementing Changes
-Track these steps as TODOs and complete them one by one.
-1. **Read proposal.md** - Understand what's being built
-2. **Read design.md** (if exists) - Review technical decisions
-3. **Read tasks.md** - Get implementation checklist
-4. **Implement tasks sequentially** - Complete in order
-5. **Confirm completion** - Ensure every item in `tasks.md` is finished before updating statuses
-6. **Update checklist** - After all work is done, set every task to `- [x]` so the list reflects reality
-7. **Approval gate** - Do not start implementation until the proposal is reviewed and approved
+### ステージ 2: 変更の実装
+次の手順を TODO として管理し、順番に完了させる。
+1. **proposal.md を読む** — 作業対象を理解する
+2. **design.md を読む**（存在する場合）— 技術的判断を確認する
+3. **tasks.md を読む** — 実装チェックリストを把握する
+4. **タスクを順番に実装する** — 記載順に進める
+5. **完了を確認する** — `tasks.md` の各項目が終わっていることを確認してからステータスを更新する
+6. **チェックリストを更新する** — すべて完了したら該当項目を `- [x]` にして現状を反映する
+7. **承認ゲート** — 提案がレビュー・承認されるまでは実装を開始しない
 
-### Stage 3: Archiving Changes
-After deployment, create separate PR to:
-- Move `changes/[name]/` → `changes/archive/YYYY-MM-DD-[name]/`
-- Update `specs/` if capabilities changed
-- Use `openspec archive <change-id> --skip-specs --yes` for tooling-only changes (always pass the change ID explicitly)
-- Run `openspec validate --strict` to confirm the archived change passes checks
+### ステージ 3: 変更のアーカイブ
+リリース後は別 PR で次を行う:
+- `changes/[name]/` を `changes/archive/YYYY-MM-DD-[name]/` へ移動
+- ケイパビリティに変更がある場合は `specs/` を更新
+- ツール類のみの変更は `openspec archive <change-id> --skip-specs --yes` を使用（必ず change ID を明示する）
+- `openspec validate --strict` を走らせ、アーカイブした変更がチェックを通ることを確認
 
-## Before Any Task
+## タスク着手前チェック
 
-**Context Checklist:**
-- [ ] Read relevant specs in `specs/[capability]/spec.md`
-- [ ] Check pending changes in `changes/` for conflicts
-- [ ] Read `openspec/project.md` for conventions
-- [ ] Run `openspec list` to see active changes
-- [ ] Run `openspec list --specs` to see existing capabilities
+**コンテキストチェックリスト:**
+- [ ] `specs/[capability]/spec.md` 内の該当スペックを読む
+- [ ] `changes/` に未完了の変更がないか確認する
+- [ ] `openspec/project.md` で規約を確認する
+- [ ] `openspec list` でアクティブな変更を確認する
+- [ ] `openspec list --specs` で既存ケイパビリティを確認する
 
-**Before Creating Specs:**
-- Always check if capability already exists
-- Prefer modifying existing specs over creating duplicates
-- Use `openspec show [spec]` to review current state
-- If request is ambiguous, ask 1–2 clarifying questions before scaffolding
+**スペック作成前:**
+- 同じケイパビリティが既に存在しないか必ず確認する
+- 重複を避けるため、既存スペックの修正を優先する
+- `openspec show [spec]` で現状を確認する
+- 依頼が曖昧な場合は 1〜2 件の質問で明確化してから作業する
 
-### Search Guidance
-- Enumerate specs: `openspec spec list --long` (or `--json` for scripts)
-- Enumerate changes: `openspec list` (or `openspec change list --json` - deprecated but available)
-- Show details:
-  - Spec: `openspec show <spec-id> --type spec` (use `--json` for filters)
-  - Change: `openspec show <change-id> --json --deltas-only`
-- Full-text search (use ripgrep): `rg -n "Requirement:|Scenario:" openspec/specs`
+### 検索ガイド
+- スペック一覧: `openspec spec list --long`（スクリプト用途は `--json`）
+- 変更一覧: `openspec list`（非推奨だが `openspec change list --json` も利用可能）
+- 詳細表示:
+  - スペック: `openspec show <spec-id> --type spec`（フィルタ用に `--json`）
+  - 変更: `openspec show <change-id> --json --deltas-only`
+- 全文検索は ripgrep を使用: `rg -n "Requirement:|Scenario:" openspec/specs`
 
-## Quick Start
+## クイックスタート
 
-### CLI Commands
+### CLI コマンド
 
 ```bash
-# Essential commands
-openspec list                  # List active changes
-openspec list --specs          # List specifications
-openspec show [item]           # Display change or spec
-openspec validate [item]       # Validate changes or specs
-openspec archive <change-id> [--yes|-y]   # Archive after deployment (add --yes for non-interactive runs)
+# 基本コマンド
+openspec list                  # 進行中の変更を一覧
+openspec list --specs          # 仕様一覧
+openspec show [item]           # 変更または仕様の内容を表示
+openspec validate [item]       # 変更または仕様を検証
+openspec archive <change-id> [--yes|-y]   # リリース後にアーカイブ（対話なしは --yes）
 
-# Project management
-openspec init [path]           # Initialize OpenSpec
-openspec update [path]         # Update instruction files
+# プロジェクト管理
+openspec init [path]           # OpenSpec を初期化
+openspec update [path]         # 指示ファイルを更新
 
-# Interactive mode
-openspec show                  # Prompts for selection
-openspec validate              # Bulk validation mode
+# 対話モード
+openspec show                  # 対話的に対象を選択
+openspec validate              # 一括バリデーション
 
-# Debugging
+# デバッグ
 openspec show [change] --json --deltas-only
 openspec validate [change] --strict
 ```
 
-### Command Flags
+### コマンドフラグ
 
-- `--json` - Machine-readable output
-- `--type change|spec` - Disambiguate items
-- `--strict` - Comprehensive validation
-- `--no-interactive` - Disable prompts
-- `--skip-specs` - Archive without spec updates
-- `--yes`/`-y` - Skip confirmation prompts (non-interactive archive)
+- `--json` - 機械可読な出力
+- `--type change|spec` - アイテムの種類を指定
+- `--strict` - 厳密な検証
+- `--no-interactive` - プロンプトなしで実行
+- `--skip-specs` - スペック更新なしでアーカイブ
+- `--yes`/`-y` - 確認プロンプトをスキップ（非対話アーカイブ向け）
 
-## Directory Structure
+## ディレクトリ構成
 
 ```
 openspec/
-├── project.md              # Project conventions
-├── specs/                  # Current truth - what IS built
-│   └── [capability]/       # Single focused capability
-│       ├── spec.md         # Requirements and scenarios
-│       └── design.md       # Technical patterns
-├── changes/                # Proposals - what SHOULD change
+├── project.md              # プロジェクト規約
+├── specs/                  # すでに構築済みの真実
+│   └── [capability]/       # 単一目的のケイパビリティ
+│       ├── spec.md         # 要件とシナリオ
+│       └── design.md       # 技術パターン
+├── changes/                # 変更提案（これから変わるもの）
 │   ├── [change-name]/
-│   │   ├── proposal.md     # Why, what, impact
-│   │   ├── tasks.md        # Implementation checklist
-│   │   ├── design.md       # Technical decisions (optional; see criteria)
-│   │   └── specs/          # Delta changes
+│   │   ├── proposal.md     # Why / What / Impact
+│   │   ├── tasks.md        # 実装チェックリスト
+│   │   ├── design.md       # 技術判断（必要なら）
+│   │   └── specs/          # 差分スペック
 │   │       └── [capability]/
 │   │           └── spec.md # ADDED/MODIFIED/REMOVED
-│   └── archive/            # Completed changes
+│   └── archive/            # 完了した変更
 ```
 
-## Creating Change Proposals
+## 変更提案の作成
 
-### Decision Tree
+### 判断ツリー
 
 ```
-New request?
-├─ Bug fix restoring spec behavior? → Fix directly
-├─ Typo/format/comment? → Fix directly  
-├─ New feature/capability? → Create proposal
-├─ Breaking change? → Create proposal
-├─ Architecture change? → Create proposal
-└─ Unclear? → Create proposal (safer)
+新しい依頼？
+├─ 仕様どおりの挙動へ戻すバグ修正 → 直接修正
+├─ タイポ／整形／コメント → 直接修正
+├─ 新機能／新ケイパビリティ → 提案を作成
+├─ 破壊的変更 → 提案を作成
+├─ アーキテクチャ変更 → 提案を作成
+└─ 判断がつかない → 提案を作る方が安全
 ```
 
-### Proposal Structure
+### 提案の構成
 
-1. **Create directory:** `changes/[change-id]/` (kebab-case, verb-led, unique)
+1. **ディレクトリを用意:** `changes/[change-id]/`（ケバブケースで動詞始まり、重複不可）
 
-2. **Write proposal.md:**
+2. **proposal.md を記述:**
 ```markdown
 ## Why
-[1-2 sentences on problem/opportunity]
+[課題や機会を 1〜2 文で]
 
 ## What Changes
-- [Bullet list of changes]
-- [Mark breaking changes with **BREAKING**]
+- [変更点の箇条書き]
+- [破壊的変更は **BREAKING** を付記]
 
 ## Impact
-- Affected specs: [list capabilities]
-- Affected code: [key files/systems]
+- 影響するスペック: [ケイパビリティ一覧]
+- 影響するコード: [主なファイル／システム]
 ```
 
-3. **Create spec deltas:** `specs/[capability]/spec.md`
+3. **スペック差分を作成:** `specs/[capability]/spec.md`
 ```markdown
 ## ADDED Requirements
 ### Requirement: New Feature
@@ -184,152 +184,152 @@ The system SHALL provide...
 
 ## MODIFIED Requirements
 ### Requirement: Existing Feature
-[Complete modified requirement]
+[変更後の要件全文]
 
 ## REMOVED Requirements
 ### Requirement: Old Feature
-**Reason**: [Why removing]
-**Migration**: [How to handle]
+**Reason**: [削除理由]
+**Migration**: [移行方法]
 ```
-If multiple capabilities are affected, create multiple delta files under `changes/[change-id]/specs/<capability>/spec.md`—one per capability.
+複数のケイパビリティに影響する場合は `changes/[change-id]/specs/<capability>/spec.md` をそれぞれ作成する。
 
-4. **Create tasks.md:**
+4. **tasks.md を作成:**
 ```markdown
 ## 1. Implementation
-- [ ] 1.1 Create database schema
-- [ ] 1.2 Implement API endpoint
-- [ ] 1.3 Add frontend component
-- [ ] 1.4 Write tests
+- [ ] 1.1 データベーススキーマを作成
+- [ ] 1.2 API エンドポイントを実装
+- [ ] 1.3 フロントエンドコンポーネントを実装
+- [ ] 1.4 テストを書く
 ```
 
-5. **Create design.md when needed:**
-Create `design.md` if any of the following apply; otherwise omit it:
-- Cross-cutting change (multiple services/modules) or a new architectural pattern
-- New external dependency or significant data model changes
-- Security, performance, or migration complexity
-- Ambiguity that benefits from technical decisions before coding
+5. **必要なときだけ design.md を作成:**
+以下のいずれかに該当する場合は `design.md` を追加し、それ以外は省略する:
+- サービス／モジュールをまたぐ横断的な変更、または新しいアーキテクチャパターン
+- 新しい外部依存や大きなデータモデル変更
+- セキュリティ、パフォーマンス、移行の複雑性が高い変更
+- 実装前に技術判断を整理した方がよい曖昧さが残っている場合
 
-Minimal `design.md` skeleton:
+最小の `design.md` ひな形:
 ```markdown
 ## Context
-[Background, constraints, stakeholders]
+[背景、制約、ステークホルダー]
 
 ## Goals / Non-Goals
 - Goals: [...]
 - Non-Goals: [...]
 
 ## Decisions
-- Decision: [What and why]
-- Alternatives considered: [Options + rationale]
+- Decision: [内容と理由]
+- Alternatives considered: [選択肢と判断理由]
 
 ## Risks / Trade-offs
-- [Risk] → Mitigation
+- [リスク] → 対応策
 
 ## Migration Plan
-[Steps, rollback]
+[手順、ロールバック方法]
 
 ## Open Questions
 - [...]
 ```
 
-## Spec File Format
+## スペックファイルのフォーマット
 
-### Critical: Scenario Formatting
+### 重要: シナリオの書式
 
-**CORRECT** (use #### headers):
+**正しい例**（`####` ヘッダーを使用）:
 ```markdown
 #### Scenario: User login success
 - **WHEN** valid credentials provided
 - **THEN** return JWT token
 ```
 
-**WRONG** (don't use bullets or bold):
+**誤った例**（箇条書きや太字は不可）:
 ```markdown
 - **Scenario: User login**  ❌
 **Scenario**: User login     ❌
 ### Scenario: User login      ❌
 ```
 
-Every requirement MUST have at least one scenario.
+すべての要件には少なくとも 1 つのシナリオが必要。
 
-### Requirement Wording
-- Use SHALL/MUST for normative requirements (avoid should/may unless intentionally non-normative)
+### 要件の表現
+- 規範的な要件には SHALL/MUST を使用（意図的に非拘束とする場合以外は should/may を避ける）
 
-### Delta Operations
+### 差分操作
 
-- `## ADDED Requirements` - New capabilities
-- `## MODIFIED Requirements` - Changed behavior
-- `## REMOVED Requirements` - Deprecated features
-- `## RENAMED Requirements` - Name changes
+- `## ADDED Requirements` - 新しいケイパビリティ
+- `## MODIFIED Requirements` - 既存挙動の変更
+- `## REMOVED Requirements` - 廃止する機能
+- `## RENAMED Requirements` - 名称変更
 
-Headers matched with `trim(header)` - whitespace ignored.
+ヘッダーは `trim(header)` で比較されるため、前後の空白は無視される。
 
-#### When to use ADDED vs MODIFIED
-- ADDED: Introduces a new capability or sub-capability that can stand alone as a requirement. Prefer ADDED when the change is orthogonal (e.g., adding "Slash Command Configuration") rather than altering the semantics of an existing requirement.
-- MODIFIED: Changes the behavior, scope, or acceptance criteria of an existing requirement. Always paste the full, updated requirement content (header + all scenarios). The archiver will replace the entire requirement with what you provide here; partial deltas will drop previous details.
-- RENAMED: Use when only the name changes. If you also change behavior, use RENAMED (name) plus MODIFIED (content) referencing the new name.
+#### ADDED と MODIFIED の使い分け
+- ADDED: 独立した要件として成立する新しい機能や副次機能を追加するとき。既存の要件に影響しない場合は ADDED を優先。
+- MODIFIED: 既存要件の挙動・範囲・受け入れ条件が変わるとき。ヘッダーとシナリオを含む要件全文を貼り付け、更新後の姿をそのまま記述する。部分更新だけでは旧情報が欠落する。
+- RENAMED: 名称だけ変える場合に使用。挙動も変えるなら RENAMED（名称）と MODIFIED（内容）の両方を記述する。
 
-Common pitfall: Using MODIFIED to add a new concern without including the previous text. This causes loss of detail at archive time. If you aren’t explicitly changing the existing requirement, add a new requirement under ADDED instead.
+ありがちな落とし穴: MODIFIED で新しい論点を追加したのに既存要件の全文を含めないケース。アーカイブ時に旧情報が失われるので、既存要件を丸ごと貼ってから編集すること。
 
-Authoring a MODIFIED requirement correctly:
-1) Locate the existing requirement in `openspec/specs/<capability>/spec.md`.
-2) Copy the entire requirement block (from `### Requirement: ...` through its scenarios).
-3) Paste it under `## MODIFIED Requirements` and edit to reflect the new behavior.
-4) Ensure the header text matches exactly (whitespace-insensitive) and keep at least one `#### Scenario:`.
+MODIFIED 要件の正しい手順:
+1) `openspec/specs/<capability>/spec.md` から該当要件を見つける。
+2) `### Requirement: ...` からシナリオまでのブロックをコピーする。
+3) `## MODIFIED Requirements` 配下に貼り付け、変更内容を反映させる。
+4) ヘッダーの文言を完全一致させ（空白は無視）、少なくとも 1 つ `#### Scenario:` を残す。
 
-Example for RENAMED:
+RENAMED の例:
 ```markdown
 ## RENAMED Requirements
 - FROM: `### Requirement: Login`
 - TO: `### Requirement: User Authentication`
 ```
 
-## Troubleshooting
+## トラブルシューティング
 
-### Common Errors
+### よくあるエラー
 
-**"Change must have at least one delta"**
-- Check `changes/[name]/specs/` exists with .md files
-- Verify files have operation prefixes (## ADDED Requirements)
+**「Change must have at least one delta」**
+- `changes/[name]/specs/` に .md ファイルが存在することを確認
+- ファイルに操作種別ヘッダー（## ADDED Requirements など）があるか確認
 
-**"Requirement must have at least one scenario"**
-- Check scenarios use `#### Scenario:` format (4 hashtags)
-- Don't use bullet points or bold for scenario headers
+**「Requirement must have at least one scenario」**
+- `#### Scenario:` 形式で書かれているか確認
+- 箇条書きや太字で書いていないか確認
 
-**Silent scenario parsing failures**
-- Exact format required: `#### Scenario: Name`
-- Debug with: `openspec show [change] --json --deltas-only`
+**シナリオ解析が黙って失敗する場合**
+- 正しい書式は `#### Scenario: 名前`。これ以外は認識されない。
+- `openspec show [change] --json --deltas-only` でデバッグする。
 
-### Validation Tips
+### バリデーションのコツ
 
 ```bash
-# Always use strict mode for comprehensive checks
+# 厳密なチェックを常に利用
 openspec validate [change] --strict
 
-# Debug delta parsing
+# 差分解析をデバッグ
 openspec show [change] --json | jq '.deltas'
 
-# Check specific requirement
+# 特定の要件を確認
 openspec show [spec] --json -r 1
 ```
 
-## Happy Path Script
+## ハッピーパスの例
 
 ```bash
-# 1) Explore current state
+# 1) 現状を調べる
 openspec spec list --long
 openspec list
-# Optional full-text search:
+# 任意の全文検索:
 # rg -n "Requirement:|Scenario:" openspec/specs
 # rg -n "^#|Requirement:" openspec/changes
 
-# 2) Choose change id and scaffold
+# 2) change-id を決めてひな形を作成
 CHANGE=add-two-factor-auth
 mkdir -p openspec/changes/$CHANGE/{specs/auth}
 printf "## Why\n...\n\n## What Changes\n- ...\n\n## Impact\n- ...\n" > openspec/changes/$CHANGE/proposal.md
 printf "## 1. Implementation\n- [ ] 1.1 ...\n" > openspec/changes/$CHANGE/tasks.md
 
-# 3) Add deltas (example)
+# 3) 差分スペックを追加（例）
 cat > openspec/changes/$CHANGE/specs/auth/spec.md << 'EOF'
 ## ADDED Requirements
 ### Requirement: Two-Factor Authentication
@@ -340,11 +340,11 @@ Users MUST provide a second factor during login.
 - **THEN** an OTP challenge is required
 EOF
 
-# 4) Validate
+# 4) バリデーション
 openspec validate $CHANGE --strict
 ```
 
-## Multi-Capability Example
+## 複数ケイパビリティの例
 
 ```
 openspec/changes/add-2fa-notify/
@@ -354,7 +354,7 @@ openspec/changes/add-2fa-notify/
     ├── auth/
     │   └── spec.md   # ADDED: Two-Factor Authentication
     └── notifications/
-        └── spec.md   # ADDED: OTP email notification
+        └── spec.md   # ADDED: OTP Email Notification
 ```
 
 auth/spec.md
@@ -371,84 +371,84 @@ notifications/spec.md
 ...
 ```
 
-## Best Practices
+## ベストプラクティス
 
-### Simplicity First
-- Default to <100 lines of new code
-- Single-file implementations until proven insufficient
-- Avoid frameworks without clear justification
-- Choose boring, proven patterns
+### シンプル第一
+- 新規コードは基本 100 行未満に抑える
+- 単一ファイル実装から始め、必要になるまで分割しない
+- 明確な理由がなければ新たなフレームワーク導入を避ける
+- 地に足のついた実績あるパターンを選ぶ
 
-### Complexity Triggers
-Only add complexity with:
-- Performance data showing current solution too slow
-- Concrete scale requirements (>1000 users, >100MB data)
-- Multiple proven use cases requiring abstraction
+### 複雑化のトリガー
+以下の状況でのみ複雑さを追加する:
+- 現状では性能が足りないと示すデータがある
+- 具体的なスケール要求（1000 ユーザー超、100MB 超など）がある
+- 複数の確かなユースケースが抽象化を求めている
 
-### Clear References
-- Use `file.ts:42` format for code locations
-- Reference specs as `specs/auth/spec.md`
-- Link related changes and PRs
+### 明快な参照
+- コード位置は `file.ts:42` 形式
+- スペック参照は `specs/auth/spec.md`
+- 関連する変更や PR もリンクする
 
-### Capability Naming
-- Use verb-noun: `user-auth`, `payment-capture`
-- Single purpose per capability
-- 10-minute understandability rule
-- Split if description needs "AND"
+### ケイパビリティ命名
+- 動詞 + 名詞の組み合わせ（例: `user-auth`, `payment-capture`）
+- ケイパビリティは単一目的に絞る
+- 「10 分で理解できる」ことを目安にする
+- 説明に AND が必要になるなら分割を検討
 
-### Change ID Naming
-- Use kebab-case, short and descriptive: `add-two-factor-auth`
-- Prefer verb-led prefixes: `add-`, `update-`, `remove-`, `refactor-`
-- Ensure uniqueness; if taken, append `-2`, `-3`, etc.
+### change-id の命名
+- ケバブケースで短く説明的に: `add-two-factor-auth`
+- 動詞始まりを推奨: `add-`、`update-`、`remove-`、`refactor-` など
+- 重複していたら `-2`, `-3` を付けて調整
 
-## Tool Selection Guide
+## ツール選択ガイド
 
-| Task | Tool | Why |
+| タスク | ツール | 理由 |
 |------|------|-----|
-| Find files by pattern | Glob | Fast pattern matching |
-| Search code content | Grep | Optimized regex search |
-| Read specific files | Read | Direct file access |
-| Explore unknown scope | Task | Multi-step investigation |
+| パターンでファイル検索 | Glob | パターン検索が高速 |
+| コード内容を検索 | Grep | 正規表現検索に最適化 |
+| 特定ファイルを読む | Read | ファイルに直接アクセス |
+| スコープ調査 | Task | 複数ステップの調査に適する |
 
-## Error Recovery
+## エラー復旧
 
-### Change Conflicts
-1. Run `openspec list` to see active changes
-2. Check for overlapping specs
-3. Coordinate with change owners
-4. Consider combining proposals
+### 変更の衝突
+1. `openspec list` を実行してアクティブな変更を確認
+2. 重複するスペックがないか調べる
+3. 変更の担当者と調整する
+4. 必要なら提案を統合する
 
-### Validation Failures
-1. Run with `--strict` flag
-2. Check JSON output for details
-3. Verify spec file format
-4. Ensure scenarios properly formatted
+### バリデーション失敗
+1. `--strict` フラグで再実行
+2. JSON 出力で詳細を確認
+3. スペックファイルのフォーマットを確認
+4. シナリオが正しい形式かチェック
 
-### Missing Context
-1. Read project.md first
-2. Check related specs
-3. Review recent archives
-4. Ask for clarification
+### コンテキスト不足
+1. まず project.md を読む
+2. 関連スペックを確認
+3. 最近アーカイブされた変更を読む
+4. 不明点があれば質問する
 
-## Quick Reference
+## クイックリファレンス
 
-### Stage Indicators
-- `changes/` - Proposed, not yet built
-- `specs/` - Built and deployed
-- `archive/` - Completed changes
+### ステージの目安
+- `changes/` - 提案中で未実装
+- `specs/` - 実装済み・デプロイ済み
+- `archive/` - 完了してアーカイブ済み
 
-### File Purposes
-- `proposal.md` - Why and what
-- `tasks.md` - Implementation steps
-- `design.md` - Technical decisions
-- `spec.md` - Requirements and behavior
+### 各ファイルの用途
+- `proposal.md` - Why / What
+- `tasks.md` - 実装ステップ
+- `design.md` - 技術判断
+- `spec.md` - 要件と挙動
 
-### CLI Essentials
+### CLI の要点
 ```bash
-openspec list              # What's in progress?
-openspec show [item]       # View details
-openspec validate --strict # Is it correct?
-openspec archive <change-id> [--yes|-y]  # Mark complete (add --yes for automation)
+openspec list              # 進行中の変更は？
+openspec show [item]       # 詳細を確認
+openspec validate --strict # 検証は通る？
+openspec archive <change-id> [--yes|-y]  # 完了したらアーカイブ（自動化は --yes）
 ```
 
-Remember: Specs are truth. Changes are proposals. Keep them in sync.
+覚えておくべきこと: スペックが唯一の真実。変更は提案。両者を常に同期させること。
