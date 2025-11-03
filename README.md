@@ -3,7 +3,9 @@
 Prometheus のカスタムエクスポーターです。
 Switchbot のステータスを取得します。
 
-## 利用方法
+## 利用方法（配布）
+
+Switchbot Exporter は Docker イメージとして配布されます。以下の手順でデプロイできます。
 
 1. docker image を pull する
 
@@ -32,58 +34,52 @@ docker run --rm -d \
 
 ## 開発手順
 
-開発環境は docker コンテナになります。ローカル仮想環境で作業する場合は、`uv pip install --system --no-deps -r uv.lock -r uv.dev.lock` を実行して依存関係をそろえてください。
+Switchbot Exporter のローカル開発は uv が管理する Python 仮想環境を標準としています。Docker は配布検証やオプションの代替手段として利用できます。
 
- [コントリビューションガイド (AGENTS.md)](./AGENTS.md) および [日本語版 (AGENTS.ja.md)](./AGENTS.ja.md) も併せて参照してください。
+### 前提ソフトウェア
 
-1. secrets.example を複製し、ファイル名を .secrets に変更します
-2. .secrets を編集します
-3. docker image のビルドを行います
+- Python 3.13
+- [uv CLI](https://docs.astral.sh/uv/)
 
-```sh
-docker compose build
-```
-
-5. docker コンテナを立ち上げます
+### セットアップ
 
 ```sh
-docker run --rm -it \
-  -v $(pwd)/docker:/app \
-  -p 9171:9171 \
-  -e SWITCHBOT_API_TOKEN=test_api_token \
-  -e SWITCHBOT_API_SECRET=test_api_secret \
-  mizucopo/switchbot-exporter:develop \
-  /bin/sh
+cd docker
+uv venv .venv
+source .venv/bin/activate
+uv pip sync uv.lock uv.dev.lock
 ```
 
-6. ソースコードを編集します
-7. テストの実行をします
+必要なシークレットはリポジトリルートの `secrets.example` を `.secrets` にコピーして編集します。
+uv 仮想環境でコマンドを実行する前に、環境変数をロードしてください。
 
 ```sh
-pytest ./tests
+set -a
+source ../.secrets
+set +a
 ```
 
-8. フォーマットの確認をします
+### 開発コマンド
 
 ```sh
-mypy --pretty ./src
+pytest tests
+mypy --pretty src
+ruff check src
+black src tests
 ```
+
+uv 仮想環境を利用していれば `poetry run` や Docker 特有のボリュームマウントは不要です。詳細は [AGENTS.md](./AGENTS.md) および [AGENTS.ja.md](./AGENTS.ja.md) を参照してください。
+
+### Docker を利用した動作確認（任意）
+
+Docker での動作確認が必要な場合は `docker-compose.yml` の `prod` サービス、または `Dockerfile.prod` を用いてコンテナをビルドできます。配布時と同じパッケージング形態で検証することを意図しています。
 
 ```sh
-ruff check ./src
+docker compose build prod
+docker compose up prod
 ```
 
-```sh
-black ./src ./tests
-```
-
-9. ビルドテストを実行します
-
-```sh
-act -j build-and-push
-```
-
-10. GitHub へプルリクエストを行います
+起動後は `http://localhost:9171/metrics` にアクセスしてエクスポーターの挙動を確認できます。ローカル開発は uv 仮想環境で行い、Docker は配布および最終検証のために利用します。
 
 ## Contact
 

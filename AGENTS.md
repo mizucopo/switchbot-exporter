@@ -23,16 +23,14 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 - `docker/` holds application code, uv metadata, and Dockerfiles; treat this as the working project root.
 - `docker/src/` contains the Flask exporter (`app.py`) and the SwitchBot client (`switchbot.py`). Place new modules alongside these files.
 - `docker/tests/` mirrors the source layout for pytest suites; create matching `test_*.py` files when adding features.
-- Root-level `docker-compose.yml` and `secrets.example` document how to boot the containerized dev environment.
+- Root-level `docker-compose.yml` retains only production-oriented services; keep it in sync with container distribution needs. `secrets.example` provides the template for local secrets.
 
 ## Build, Test, and Development Commands
-- `docker compose build` — build the development image from `Dockerfile.dev`.
-- `docker run --rm -it -v $(pwd)/docker:/app ... mizucopo/switchbot-exporter:develop /bin/sh` — start an interactive shell inside the dev container (copy full command from `README.md`).
-- `uv pip install --system --no-deps -r uv.lock -r uv.dev.lock` — install application and development dependencies when working outside the dev container.
-- uv CLI is sourced from the latest PyPI release during Docker builds; pin versions by editing the Dockerfiles if stability issues surface.
-- `pytest` — execute the unit suite under `docker/tests`.
-- `ruff check ./src` and `black ./src ./tests` — lint and format Python modules.
+- `uv venv .venv` (run inside `docker/`) — create or refresh the local virtual environment managed by uv.
+- `source .venv/bin/activate` and `uv pip sync uv.lock uv.dev.lock` — install pinned runtime and tooling dependencies.
+- `pytest tests`, `mypy --pretty src`, `ruff check src`, `black src tests` — execute the validation suite directly inside the uv environment.
 - `act -j build-and-push` — rehearse the GitHub Actions workflow before raising a PR.
+- Docker images are the production distribution format: use `docker compose build prod` or `docker build -f Dockerfile.prod` when preparing releases or verifying artifacts; they are not required for day-to-day development.
 
 ## Coding Style & Naming Conventions
 - Target Python 3.13 with strict typing; keep public functions annotated to satisfy `mypy --pretty ./src`.

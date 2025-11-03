@@ -111,6 +111,13 @@ openspec show [change] --json --deltas-only
 openspec validate [change] --strict
 ```
 
+## プロジェクト固有メモ
+
+- ローカル開発は `docker/` ディレクトリで uv 管理の仮想環境を作成する（`uv venv .venv` → `source .venv/bin/activate`）。
+- 依存関係はコミット済みの `uv.lock` / `uv.dev.lock` を用いて `uv pip sync` で同期する。
+- Lint・テスト・型チェックは uv 環境内から `pytest tests`、`mypy --pretty src`、`ruff check src`、`black src tests` を直接実行する。
+- Docker イメージは配布フォーマットであり、`docker-compose.yml` には配布向けサービスのみが定義されている（リリース検証で活用する）。
+
 ### コマンドフラグ
 
 - `--json` - 機械可読な出力

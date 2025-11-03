@@ -4,7 +4,7 @@
 
 ## 2. ツールチェーン移行
 - [x] 2.1 `pyproject.toml` から `[tool.poetry]` 設定を削除し、uv で扱える PEP 621 メタデータへ移行する。
-- [x] 2.2 `uv.lock`（本番用）と `uv.dev.lock`（開発ツール用）を生成し、`poetry.lock` をバージョン管理から外す。
+- [x] 2.2 `uv.lock`（配布用）と `uv.dev.lock`（開発ツール用）を生成し、`poetry.lock` をバージョン管理から外す。
 - [x] 2.3 開発ツール類の `poetry run`/`poetry install` 呼び出しを、uv で依存を整えて直接コマンドを実行する手順へ置き換える。
 
 ## 3. ビルドと CI の更新
