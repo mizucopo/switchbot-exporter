@@ -1,16 +1,16 @@
-## Why
-- Poetry currently drives dependency management, but contributors report slow install times and extra runtime dependencies in Docker images.
-- uv offers faster lock resolution, universal support for PEP 621 `pyproject.toml`, and can act as both installer and runner, reducing tooling surface area.
-- Aligning with uv keeps the exporter lightweight and simplifies container builds by avoiding the Poetry runtime.
+## 背景
+- 依存関係管理は現在 Poetry が担っているが、開発者からはインストールが遅いことや Docker イメージに余分なランタイム依存が増えるとの指摘がある。
+- uv はロック解決が高速で、PEP 621 準拠の `pyproject.toml` を標準サポートし、インストーラー兼実行環境として機能するため、ツール面の負担を減らせる。
+- uv へ統一すれば Poetry ランタイムを避けられるためエクスポーターが軽量になり、コンテナビルドも簡素化できる。
 
-## What Changes
-- Replace Poetry with uv as the canonical dependency manager for local development, CI, and Docker images.
-- Convert the existing `pyproject.toml`/`poetry.lock` workflow to uv-compatible metadata and generate the new `uv.lock`.
-- Update Dockerfiles, Make/CI scripts, and documentation (`README.md`, developer notes) to reference uv commands.
-- Adjust lint/test invocation guidance to use `uv run` wrappers instead of `poetry run`.
+## 変更内容
+- ローカル開発・CI・Docker イメージにおける公式な依存関係マネージャーを Poetry から uv に置き換える。
+- 既存の `pyproject.toml`／`poetry.lock` ワークフローを uv 互換メタデータへ変換し、新たに `uv.lock` を生成する。
+- Dockerfile、Make/CI スクリプト、ドキュメント（`README.md`、開発メモなど）を更新し、uv コマンドを参照するようにする。
+- lint／テスト実行手順の案内を `poetry run` ではなく `uv run` ラッパーを使った記述へ改訂する。
 
-## Impact
-- Contributors will install uv (single binary) instead of Poetry; onboarding steps must reflect this.
-- Docker build layers shrink because uv does not require a virtualenv during image build, but caching behavior needs validation.
-- Downstream scripts that assume `poetry` CLI will fail until updated; coordinate rollout with CI changes to avoid breaking builds.
-- uv's resolver may surface dependency version conflicts that Poetry previously tolerated; expect at least one pass through dependency pinning.
+## 影響
+- 開発者は Poetry ではなく単一バイナリの uv をインストールすることになり、オンボーディング手順にも反映が必要。
+- uv はビルド時に仮想環境を要求しないため Docker のビルドレイヤーは縮小するが、キャッシュ挙動の検証が求められる。
+- `poetry` CLI を前提としたスクリプトは更新されるまで失敗するため、CI 更新と歩調を合わせて移行を進める必要がある。
+- uv のリゾルバーによって従来 Poetry が許容していた依存バージョンの衝突が顕在化する可能性があるため、バージョン固定の調整を想定しておく。
