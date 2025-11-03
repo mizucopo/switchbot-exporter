@@ -1,8 +1,4 @@
-# manage-dependencies Specification
-
-## Purpose
-SwitchBot Exporter が uv を用いて Python の依存関係を管理し、ローカル開発・CI・コンテナビルドで同一の再現可能なロックファイルを共有できるようにする方法を文書化する。
-## Requirements
+## MODIFIED Requirements
 ### Requirement: uv による依存関係管理
 プロジェクトはローカル開発、CI、コンテナビルド全体を通じて Python の依存関係の解決と実行に uv を利用することを MUST とする。
 
@@ -15,4 +11,3 @@ SwitchBot Exporter が uv を用いて Python の依存関係を管理し、ロ�
 - **WHEN** ドキュメント化されたワークフローに従って lint、型チェック、テストのコマンドを実行する
 - **THEN** コマンドは uv が用意した環境内で実行され（`poetry run` ラッパーは使用しない）
 - **AND** `poetry run` が利用可能であることを前提としない。
-
