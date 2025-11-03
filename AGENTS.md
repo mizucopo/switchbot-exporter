@@ -31,7 +31,7 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 - `docker/` はアプリケーションコード、uv のメタデータ、Dockerfile を保持する作業用ルートディレクトリです。
 - `docker/src/` には Flask エクスポーター（`app.py`）と SwitchBot クライアント（`switchbot.py`）があり、新しいモジュールはこの階層に追加します。
 - `docker/tests/` はソース構成と同じディレクトリ構造で pytest スイートを配置します。機能を追加する際は対応する `test_*.py` を作成してください。
-- `secrets.example` をローカルシークレットのテンプレートとして利用します。
+- `env.example` をローカルシークレットのテンプレートとして利用します。
 
 ## ビルド・テスト・開発コマンド
 - `uv venv .venv`（`docker/` ディレクトリ内で実行）— uv 管理のローカル仮想環境を作成または更新します。
@@ -56,6 +56,8 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 - PR では変更概要、実行した検証コマンド、関連 Issue を記載し、メトリクスやエンドポイント出力が変わる場合はスクリーンショットなども添付するとレビューが容易になります。
 
 ## セキュリティと設定の注意事項
-- ローカル開発では `secrets.example` を `.secrets` にコピーし、実際の認証情報は絶対にコミットしません。
+- ローカル開発では `env.example` を `.env` にコピーし、実際の環境変数の値を設定します。認証情報などの機密データは絶対にコミットしません。
+- python-decouple がプロジェクトルートの `.env` ファイルを自動的に読み込みます。手動での環境変数読み込みは不要です。
 - 必須環境変数は `SWITCHBOT_API_TOKEN` と `SWITCHBOT_API_SECRET` です。任意のキャッシュ設定（`CACHE_DIR`、`CACHE_EXPIRE_SECOND`、`DELAY_SECOND`）については `README.md` を参照してください。
 - Docker を利用する際は、マウントする `CACHE_DIR` に書き込み権限があることを確認してエクスポーターのクラッシュを防ぎます。
+- 設定管理は `python-decouple` を使用しており、型安全なキャストと `.env` ファイルサポートを提供します。詳細は `src/config.py` を参照してください。
