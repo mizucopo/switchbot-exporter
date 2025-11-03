@@ -14,11 +14,11 @@ COPY --from=builder /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
 COPY --from=builder /etc/timezone /etc/timezone
 
 WORKDIR /app
-COPY pyproject.toml poetry.lock ./
+COPY pyproject.toml uv.lock ./
 COPY src ./
 
-RUN pip install --no-cache-dir poetry==1.8.* \
-  && poetry install --without=dev \
-  && rm ./poetry.lock
+RUN pip install --no-cache-dir uv \
+  && uv pip install --system --no-deps --requirement uv.lock \
+  && rm -rf /root/.cache/uv
 
-CMD ["poetry", "run", "gunicorn", "-w", "4", "-b", "0.0.0.0:9171", "--timeout", "180", "--chdir", "/app", "app:app"]
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:9171", "--timeout", "180", "--chdir", "/app", "app:app"]

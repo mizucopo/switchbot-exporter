@@ -1,7 +1,9 @@
 FROM mizucopo/switchbot-exporter:latest
 
 WORKDIR /app
-COPY pyproject.toml poetry.lock ./
-RUN poetry install
+COPY pyproject.toml uv.lock uv.dev.lock ./
+RUN pip install --no-cache-dir uv \
+  && uv pip install --system --no-deps --requirement uv.lock --requirement uv.dev.lock \
+  && rm -rf /root/.cache/uv
 
 CMD ["/bin/sh"]

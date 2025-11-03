@@ -1,25 +1,30 @@
-[tool.poetry]
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
 name = "switchbot-exporter"
 version = "1.0.0"
 description = "Prometheus SwitchBot Exporter"
-authors = ["mizu <mizu.copo@gmail.com>"]
-package-mode = false
+authors = [{ name = "mizu", email = "mizu.copo@gmail.com" }]
+requires-python = ">=3.13,<4.0"
+dependencies = [
+    "click~=8.1",
+    "requests~=2.32",
+    "inflect~=7.4",
+    "inflection~=0.5",
+    "flask~=3.0",
+    "gunicorn~=23.0",
+]
 
-[tool.poetry.dependencies]
-python = "~3.13"
-click = "~8.1"
-requests = "~2.32"
-inflect = "~7.4"
-inflection = "~0.5"
-flask = "~3.0"
-gunicorn = "~23.0"
-
-[tool.poetry.group.dev.dependencies]
-black = "~24.10"
-mypy = "~1.13"
-ruff = "~0.7"
-types-requests = "~2.32"
-pytest = "~8.3"
+[project.optional-dependencies]
+dev = [
+    "black~=24.10",
+    "mypy~=1.13",
+    "ruff~=0.7",
+    "types-requests~=2.32",
+    "pytest~=8.3",
+]
 
 [tool.black]
 line-length = 88
