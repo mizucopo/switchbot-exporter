@@ -16,3 +16,8 @@ The repository guidelines in `AGENTS.md` MUST provide a Japanese translation alo
 - **THEN** they direct contributors to use plain `docker build` and `docker run` commands instead of Docker Compose services
 - **AND** the instructions emphasize that the project maintains a single-image workflow without Compose orchestration.
 
+#### Scenario: Describe flattened project layout
+- **WHEN** the documentation explains where source code, tests, and lockfiles are located
+- **THEN** it states that `src/`, `tests/`, `pyproject.toml`, and uv lockfiles reside at the repository root rather than inside a nested `docker/` directory
+- **AND** setup commands instruct contributors to run tooling from the repository root without requiring `cd docker`.
+
