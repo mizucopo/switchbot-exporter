@@ -72,11 +72,15 @@ uv 仮想環境を利用していれば `poetry run` や Docker 特有のボリ�
 
 ### Docker を利用した動作確認（任意）
 
-Docker での動作確認が必要な場合は `docker-compose.yml` の `prod` サービス、または `Dockerfile.prod` を用いてコンテナをビルドできます。配布時と同じパッケージング形態で検証することを意図しています。
+Docker での動作確認が必要な場合は `Dockerfile` を用いてコンテナをビルドできます。配布時と同じパッケージング形態で検証することを意図しています。
 
 ```sh
-docker compose build prod
-docker compose up prod
+docker build -f docker/Dockerfile -t switchbot-exporter:local ./docker
+docker run --rm -d \
+  -p 9171:9171 \
+  -e SWITCHBOT_API_TOKEN=test_api_token \
+  -e SWITCHBOT_API_SECRET=test_api_secret \
+  switchbot-exporter:local
 ```
 
 起動後は `http://localhost:9171/metrics` にアクセスしてエクスポーターの挙動を確認できます。ローカル開発は uv 仮想環境で行い、Docker は配布および最終検証のために利用します。
