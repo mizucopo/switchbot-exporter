@@ -12,6 +12,12 @@ OpenSpec を用いて仕様駆動開発を進める AI コーディングアシ�
 - バリデーション: `openspec validate [change-id] --strict` を実行し、問題を修正する
 - 承認の取得: 提案が承認されるまで実装を開始しない
 
+## プロジェクト固有メモ
+
+- ローカル開発は `docker/` ディレクトリで uv 管理の仮想環境を作成する（`uv venv .venv` → `source .venv/bin/activate`）。
+- `uv.lock` と `uv.dev.lock` を `uv pip sync` で同期し、`pytest tests` / `mypy --pretty src` / `ruff check src` / `black src tests` を uv 環境内で実行する。
+- Docker イメージは配布のためのフォーマットで、`docker-compose.yml` には配布サービスのみが含まれている（リリース検証時に利用する）。
+
 ## 3 段階ワークフロー
 
 ### ステージ 1: 変更の作成
@@ -85,47 +91,6 @@ OpenSpec を用いて仕様駆動開発を進める AI コーディングアシ�
   - スペック: `openspec show <spec-id> --type spec`（フィルタ用に `--json`）
   - 変更: `openspec show <change-id> --json --deltas-only`
 - 全文検索は ripgrep を使用: `rg -n "Requirement:|Scenario:" openspec/specs`
-
-## クイックスタート
-
-### CLI コマンド
-
-```bash
-# 基本コマンド
-openspec list                  # 進行中の変更を一覧
-openspec list --specs          # 仕様一覧
-openspec show [item]           # 変更または仕様の内容を表示
-openspec validate [item]       # 変更または仕様を検証
-openspec archive <change-id> [--yes|-y]   # リリース後にアーカイブ（対話なしは --yes）
-
-# プロジェクト管理
-openspec init [path]           # OpenSpec を初期化
-openspec update [path]         # 指示ファイルを更新
-
-# 対話モード
-openspec show                  # 対話的に対象を選択
-openspec validate              # 一括バリデーション
-
-# デバッグ
-openspec show [change] --json --deltas-only
-openspec validate [change] --strict
-```
-
-## プロジェクト固有メモ
-
-- ローカル開発は `docker/` ディレクトリで uv 管理の仮想環境を作成する（`uv venv .venv` → `source .venv/bin/activate`）。
-- 依存関係はコミット済みの `uv.lock` / `uv.dev.lock` を用いて `uv pip sync` で同期する。
-- Lint・テスト・型チェックは uv 環境内から `pytest tests`、`mypy --pretty src`、`ruff check src`、`black src tests` を直接実行する。
-- Docker イメージは配布フォーマットであり、`docker-compose.yml` には配布向けサービスのみが定義されている（リリース検証で活用する）。
-
-### コマンドフラグ
-
-- `--json` - 機械可読な出力
-- `--type change|spec` - アイテムの種類を指定
-- `--strict` - 厳密な検証
-- `--no-interactive` - プロンプトなしで実行
-- `--skip-specs` - スペック更新なしでアーカイブ
-- `--yes`/`-y` - 確認プロンプトをスキップ（非対話アーカイブ向け）
 
 ## ディレクトリ構成
 
@@ -436,6 +401,40 @@ notifications/spec.md
 2. 関連スペックを確認
 3. 最近アーカイブされた変更を読む
 4. 不明点があれば質問する
+
+## クイックスタート
+
+### CLI コマンド
+
+```bash
+# 基本コマンド
+openspec list                  # 進行中の変更を一覧
+openspec list --specs          # 仕様一覧
+openspec show [item]           # 変更または仕様の内容を表示
+openspec validate [item]       # 変更または仕様を検証
+openspec archive <change-id> [--yes|-y]   # リリース後にアーカイブ（対話なしは --yes）
+
+# プロジェクト管理
+openspec init [path]           # OpenSpec を初期化
+openspec update [path]         # 指示ファイルを更新
+
+# 対話モード
+openspec show                  # 対話的に対象を選択
+openspec validate              # 一括バリデーション
+
+# デバッグ
+openspec show [change] --json --deltas-only
+openspec validate [change] --strict
+```
+
+### コマンドフラグ
+
+- `--json` - 機械可読な出力
+- `--type change|spec` - アイテムの種類を指定
+- `--strict` - 厳密な検証
+- `--no-interactive` - プロンプトなしで実行
+- `--skip-specs` - スペック更新なしでアーカイブ
+- `--yes`/`-y` - 確認プロンプトをスキップ（非対話アーカイブ向け）
 
 ## クイックリファレンス
 
