@@ -68,7 +68,7 @@ ruff check src
 black src tests
 ```
 
-uv 仮想環境を利用していれば `poetry run` や Docker 特有のボリュームマウントは不要です。詳細は [AGENTS.md](./AGENTS.md) および [AGENTS.ja.md](./AGENTS.ja.md) を参照してください。
+uv 仮想環境を利用していれば `poetry run` や Docker 特有のボリュームマウントは不要です。詳細は [AGENTS.md](./AGENTS.md) を参照してください。
 
 ### Docker を利用した動作確認（任意）
 
