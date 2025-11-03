@@ -22,15 +22,16 @@ The repository guidelines in `AGENTS.md` MUST provide a Japanese translation alo
 - **AND** setup commands instruct contributors to run tooling from the repository root without requiring `cd docker`.
 
 ### Requirement: Agent Instructions Structure
-The project SHALL maintain a single source of truth for agent instructions in `openspec/AGENTS.md`.
+`openspec/AGENTS.md` MUST keep the managed instructions block intact and place the localized quick reference immediately after it.
 
-#### Scenario: Documentation consolidation
-- **WHEN** agent instructions are updated
-- **THEN** changes are made only to `openspec/AGENTS.md`
-- **AND** `openspec/AGENTS.ja.md` is not referenced
+#### Scenario: Preserve managed block
+- **WHEN** contributors edit `openspec/AGENTS.md`
+- **THEN** the file retains the `<!-- OPENSPEC:START -->` and `<!-- OPENSPEC:END -->` markers without removal
+- **AND** the managed block content remains unchanged except for updates applied by tooling
+- **AND** the localized quick reference follows immediately after the managed block.
 
-#### Scenario: Reference verification
-- **WHEN** documentation references are checked
-- **THEN** all references point to `openspec/AGENTS.md`
-- **AND** no references exist for `openspec/AGENTS.ja.md`
+#### Scenario: Highlight unified localization
+- **WHEN** the document explains where to find localized guidance
+- **THEN** it states that the Japanese quick reference lives inside `openspec/AGENTS.md`
+- **AND** it does not reference a separate `.ja.md` file.
 
