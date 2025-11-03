@@ -32,7 +32,7 @@ docker run --rm -d \
 
 ## 開発手順
 
-開発環境は docker コンテナになります
+開発環境は docker コンテナになります。ローカル仮想環境で作業する場合は、`uv pip install --system --no-deps -r uv.lock -r uv.dev.lock` を実行して依存関係をそろえてください。
 
  [コントリビューションガイド (AGENTS.md)](./AGENTS.md) および [日本語版 (AGENTS.ja.md)](./AGENTS.ja.md) も併せて参照してください。
 
@@ -60,21 +60,21 @@ docker run --rm -it \
 7. テストの実行をします
 
 ```sh
-poetry run pytest ./tests
+pytest ./tests
 ```
 
 8. フォーマットの確認をします
 
 ```sh
-poetry run mypy --pretty ./src
+mypy --pretty ./src
 ```
 
 ```sh
-poetry run ruff check ./src
+ruff check ./src
 ```
 
 ```sh
-poetry run black ./src ./tests
+black ./src ./tests
 ```
 
 9. ビルドテストを実行します

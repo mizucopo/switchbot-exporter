@@ -5,7 +5,7 @@ Expose SwitchBot device state as Prometheus metrics so that home-automation and 
 
 ## Tech Stack
 - Python 3.13 with Flask for the HTTP exporter.
-- Poetry-managed dependencies (`requests`, `prometheus_client`, `inflect/inflection`, `click`).
+- uv-managed dependencies (`pyproject.toml` + `uv.lock`) covering `requests`, `prometheus_client`, `inflect/inflection`, `click`, and tooling.
 - Docker images as the primary distribution vehicle to keep host environments clean.
 - Prometheus server scraping the exporter endpoint.
 
@@ -23,7 +23,7 @@ Expose SwitchBot device state as Prometheus metrics so that home-automation and 
 
 ### Testing Strategy
 - Use pytest for unit tests under `docker/tests`, stubbing external SwitchBot calls.
-- Run `poetry run mypy --pretty ./src`, `poetry run ruff check ./src`, and `poetry run black ./src ./tests` as part of pre-merge checks.
+- Run `mypy --pretty ./src`, `ruff check ./src`, and `black ./src ./tests` (after installing dependencies via uv) as part of pre-merge checks.
 - End-to-end validation relies on Prometheus scrape tests in staging rather than automated integration tests today.
 
 ### Git Workflow
