@@ -4,16 +4,14 @@
 - `docker/` はアプリ本体・uv 設定・Dockerfile を含む作業ルートです。
 - `docker/src/` に Flask エクスポーター（`app.py`）と SwitchBot クライアント（`switchbot.py`）があります。新しいモジュールは同階層に追加してください。
 - `docker/tests/` は pytest スイートを格納し、ソース構成と同じディレクトリ構成で `test_*.py` を配置します。
-- ルートの `docker-compose.yml` と `secrets.example` はコンテナ開発環境の起動手順と秘密情報の雛形を示します。
+- ルートの `docker-compose.yml` は配布用サービスのみを保持します。`secrets.example` はローカル開発で利用する秘密情報の雛形です。
 
 ## ビルド・テスト・開発コマンド
-- `docker compose build` — `Dockerfile.dev` をもとに開発用イメージを構築します。
-- `docker run --rm -it -v $(pwd)/docker:/app ... mizucopo/switchbot-exporter:develop /bin/sh` — 開発コンテナ内でシェルを起動します（完全なコマンドは `README.md` を参照）。
-- `uv pip install --system --no-deps -r uv.lock -r uv.dev.lock` — コンテナ外で作業する際にアプリと開発用依存関係をインストールします。
-- uv CLI は Dockerfile で PyPI の最新安定版を取得します。バージョン固定が必要になった場合は Dockerfile を更新してください。
-- `pytest` — `docker/tests` 配下のユニットテストを実行します。
-- `ruff check ./src` / `black ./src ./tests` — Python コードの lint/format を行います。
-- `act -j build-and-push` — PR 作成前に GitHub Actions のビルドワークフローをローカルで検証します。
+- `uv venv .venv`（`docker/` ディレクトリ内で実行）— uv 管理のローカル仮想環境を作成・更新します。
+- `source .venv/bin/activate` と `uv pip sync uv.lock uv.dev.lock` — ピン留めされた運用/開発依存関係をインストールします。
+- `pytest tests` / `mypy --pretty src` / `ruff check src` / `black src tests` — uv 仮想環境内で直接バリデーションを実行します。
+- `act -j build-and-push` — PR 作成前に GitHub Actions ワークフローをローカルで確認します。
+- Docker イメージは配布フォーマットです。リリース準備や成果物検証の際は `docker compose build prod` や `docker build -f Dockerfile.prod` を利用しますが、日常開発では不要です。
 
 ## コーディング規約と命名
 - ターゲットは Python 3.13 で型チェックは厳格設定です。公開関数には型注釈を付与し、`mypy --pretty ./src` を通過させてください。

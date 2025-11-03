@@ -18,7 +18,7 @@ SwitchBot デバイスの状態を Prometheus メトリクスとして公開し�
 
 ### アーキテクチャパターン
 - `docker/src/app.py` が Flask エクスポーターを提供し、`docker/src/switchbot.py` が SwitchBot 公開 API をラップする。
-- 機能は Docker イメージとして提供し、開発者環境を汚さない。ローカル作業は開発用コンテナ内で行う。
+- ローカル開発は uv で管理された Python 仮想環境上で行い、Docker イメージは配布や最終検証のためのオプションとして維持する。
 - キャッシュや遅延の制御は SwitchBot クライアントの近くに集約し、API 利用を一元化する。
 
 ### テスト戦略
