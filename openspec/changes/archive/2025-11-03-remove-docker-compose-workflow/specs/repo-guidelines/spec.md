@@ -1,8 +1,4 @@
-# repo-guidelines Specification
-
-## Purpose
-TBD - created by archiving change localize-agents-instructions. Update Purpose after archive.
-## Requirements
+## MODIFIED Requirements
 ### Requirement: Repository Guidelines Localization
 The repository guidelines in `AGENTS.md` MUST provide a Japanese translation alongside the managed OpenSpec instructions block.
 
@@ -15,4 +11,3 @@ The repository guidelines in `AGENTS.md` MUST provide a Japanese translation alo
 - **WHEN** the guidelines explain how to validate the Docker image distribution locally
 - **THEN** they direct contributors to use plain `docker build` and `docker run` commands instead of Docker Compose services
 - **AND** the instructions emphasize that the project maintains a single-image workflow without Compose orchestration.
-

@@ -31,14 +31,14 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 - `docker/` はアプリケーションコード、uv のメタデータ、Dockerfile を保持する作業用ルートディレクトリです。
 - `docker/src/` には Flask エクスポーター（`app.py`）と SwitchBot クライアント（`switchbot.py`）があり、新しいモジュールはこの階層に追加します。
 - `docker/tests/` はソース構成と同じディレクトリ構造で pytest スイートを配置します。機能を追加する際は対応する `test_*.py` を作成してください。
-- ルートの `docker-compose.yml` は本番配布向けサービスのみを保持します。コンテナー配布の要件に合わせて同期し、`secrets.example` をローカルシークレットのテンプレートとして利用します。
+- `secrets.example` をローカルシークレットのテンプレートとして利用します。
 
 ## ビルド・テスト・開発コマンド
 - `uv venv .venv`（`docker/` ディレクトリ内で実行）— uv 管理のローカル仮想環境を作成または更新します。
 - `source .venv/bin/activate` と `uv pip sync uv.lock uv.dev.lock` — ピン留めされた運用およびツール依存関係をインストールします。
 - `pytest tests`、`mypy --pretty src`、`ruff check src`、`black src tests` — これらの検証コマンドは uv 環境内で直接実行します。
 - `act -j build-and-push` — PR を作成する前に GitHub Actions ワークフローをローカルでリハーサルします。
-- Docker イメージは本番配布フォーマットです。リリース準備や成果物確認時に `docker compose build prod` または `docker build -f Dockerfile.prod` を使用し、日常開発では不要です。
+- Docker イメージは本番配布フォーマットです。リリース準備や成果物確認時に `docker build -f docker/Dockerfile` を使用し、日常開発では不要です。
 
 ## コーディング規約と命名
 - 目標の Python バージョンは 3.13 で、型チェックは厳格設定です。公開関数には型注釈を付与し、`mypy --pretty ./src` を通過させてください。
