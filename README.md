@@ -51,6 +51,13 @@ uv pip sync uv.lock uv.dev.lock
 ```
 
 必要なシークレットはリポジトリルートの `secrets.example` を `.secrets` にコピーして編集します。
+uv 仮想環境でコマンドを実行する前に、環境変数をロードしてください。
+
+```sh
+set -a
+source ../.secrets
+set +a
+```
 
 ### 開発コマンド
 
