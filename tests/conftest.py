@@ -21,19 +21,31 @@ def vcr_config() -> dict[str, Any]:
     これらのヘッダーをマッチング対象から除外します.
     """
 
+    def before_record_request(request: Any) -> Any:
+        """カセット記録前にリクエストヘッダーの認証情報を削除."""
+        # リクエストヘッダーから認証情報を削除
+        if hasattr(request, "headers"):
+            request.headers.pop("Authorization", None)
+            request.headers.pop("sign", None)
+            request.headers.pop("t", None)
+            request.headers.pop("nonce", None)
+        return request
+
     def before_record_response(response: dict[str, Any]) -> dict[str, Any]:
-        """レスポンス記録前にヘッダーをフィルタリング."""
-        # 認証関連のヘッダーをマスク
-        if "request" in response and "headers" in response["request"]:
-            headers = response["request"]["headers"]
-            for key in ["Authorization", "sign", "t", "nonce"]:
-                if key in headers:
-                    headers[key] = ["DUMMY_" + key.upper()]
+        """カセット記録前にレスポンスヘッダーの動的な値を削除."""
+        # レスポンスヘッダーから動的な値を削除
+        if "headers" in response:
+            headers = response["headers"]
+            headers.pop("Content-Length", None)
+            headers.pop("Date", None)
+            headers.pop("switchbot-request-id", None)
+
         return response
 
     return {
         "record_mode": "once",  # 既存のカセットがあれば再生、なければ記録
         "match_on": ["method", "scheme", "host", "port", "path", "query"],
         "decode_compressed_response": True,
+        "before_record": before_record_request,
         "before_record_response": before_record_response,
     }
