@@ -6,8 +6,7 @@ from switchbot import Switchbot, SwitchbotDevice
 
 
 class TestSwitchbot(unittest.TestCase):
-
-    def setUp(self):
+    def setUp(self) -> None:
         self.api_token = "test_token"
         self.api_secret = "test_secret"
         self.cache_expire_second = 0
@@ -24,7 +23,7 @@ class TestSwitchbot(unittest.TestCase):
     #     self.switchbot.fetch_metrics(devices)
 
     @patch("switchbot.requests.get")
-    def test_fetch_devices(self, mock_get):
+    def test_fetch_devices(self, mock_get: MagicMock) -> None:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.text = json.dumps(
@@ -49,7 +48,7 @@ class TestSwitchbot(unittest.TestCase):
         self.assertEqual(devices[0].device_name, "Test Bot")
 
     @patch("switchbot.requests.get")
-    def test_fetch_device_status(self, mock_get):
+    def test_fetch_device_status(self, mock_get: MagicMock) -> None:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.text = json.dumps(
@@ -77,8 +76,10 @@ class TestSwitchbot(unittest.TestCase):
         self.assertEqual(status["body"]["electricCurrent"], 0.5)
 
     @patch("switchbot.requests.get")
-    def test_fetch_metrics(self, mock_get):
-        def mock_get_side_effect(url, *args, **kwargs):
+    def test_fetch_metrics(self, mock_get: MagicMock) -> None:
+        def mock_get_side_effect(
+            url: str, *_args: object, **_kwargs: object
+        ) -> MagicMock:
             response = MagicMock()
             if url.endswith("/123/status"):
                 response.status_code = 200
