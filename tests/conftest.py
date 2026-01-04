@@ -1,6 +1,7 @@
 """Pytest configuration for VCR cassettes."""
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 from decouple import AutoConfig
@@ -13,14 +14,14 @@ app_config = AutoConfig(search_path=search_path)
 
 
 @pytest.fixture
-def vcr_config():
+def vcr_config() -> dict[str, Any]:
     """VCRのデフォルト設定を返すフィクスチャ.
 
     SwitchBot APIは動的な署名（sign, t, nonce）を使用しているため、
     これらのヘッダーをマッチング対象から除外します.
     """
 
-    def before_record_response(response):
+    def before_record_response(response: dict[str, Any]) -> dict[str, Any]:
         """レスポンス記録前にヘッダーをフィルタリング."""
         # 認証関連のヘッダーをマスク
         if "request" in response and "headers" in response["request"]:
