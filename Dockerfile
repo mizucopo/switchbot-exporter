@@ -1,5 +1,5 @@
 # ビルドステージ
-FROM python:3.13-alpine3.20 AS builder
+FROM python:3.14-alpine AS builder
 
 RUN apk add --no-cache \
     tzdata \
@@ -8,7 +8,7 @@ RUN apk add --no-cache \
 
 
 # 実行ステージ
-FROM python:3.13-alpine3.20
+FROM python:3.14-alpine
 
 COPY --from=builder /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
 COPY --from=builder /etc/timezone /etc/timezone
@@ -17,7 +17,8 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY src ./
 
-RUN pip install --no-cache-dir uv \
+RUN apk add --no-cache gcc python3-dev musl-dev linux-headers \
+  && pip install --no-cache-dir uv \
   && uv sync --frozen \
   && rm -rf /root/.cache/uv
 
