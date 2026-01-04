@@ -53,5 +53,4 @@ def get_optional_env_var(
 
     """
     result = app_config(name, default=default, cast=cast)
-    # mypy のために型を明示的に指定
-    return result  # type: ignore
+    return cast(result)  # type: ignore

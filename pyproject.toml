@@ -25,6 +25,7 @@ dev = [
     "ruff>=0.14.10",
     "taskipy>=1.14.1",
     "types-requests>=2.32.4.20250913",
+    "python-decouple-stubs>=0.1",
 ]
 
 [tool.pytest.ini_options]

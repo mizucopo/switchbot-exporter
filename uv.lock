@@ -353,6 +353,18 @@ wheels = [
 ]
 
 [[package]]
+name = "python-decouple-stubs"
+version = "3.8.0.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "python-decouple" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/68/27/0d58fdf76d088ee21a7605ea6a48cd75d75400ed9322e6e3f1e933f8dd26/python_decouple_stubs-3.8.0.4.tar.gz", hash = "sha256:9926133d6ee609248a44e5c0ebc9f9391cbe221c8acb5d34980c1e70ac4007d0", size = 3335, upload-time = "2024-12-02T07:17:31.628Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/dd/ea/dbe2ad5e2c935ebdb4398971348a64f261e1092c1dd307b376d0d328f842/python_decouple_stubs-3.8.0.4-py3-none-any.whl", hash = "sha256:2c1ea62305077651637b7e310427aca6d2627d214c438663a5fb3bd4b701b042", size = 4276, upload-time = "2024-12-02T07:17:30.062Z" },
+]
+
+[[package]]
 name = "requests"
 version = "2.32.5"
 source = { registry = "https://pypi.org/simple" }
@@ -412,6 +424,7 @@ dev = [
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-mock" },
+    { name = "python-decouple-stubs" },
     { name = "ruff" },
     { name = "taskipy" },
     { name = "types-requests" },
@@ -433,6 +446,7 @@ dev = [
     { name = "mypy", specifier = ">=1.19.1" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-mock", specifier = ">=3.15.1" },
+    { name = "python-decouple-stubs", specifier = ">=0.1" },
     { name = "ruff", specifier = ">=0.14.10" },
     { name = "taskipy", specifier = ">=1.14.1" },
     { name = "types-requests", specifier = ">=2.32.4.20250913" },
