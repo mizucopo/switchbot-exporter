@@ -129,4 +129,4 @@ __pypackages__/
 .env
 
 # VCR cassettes
-tests/cassettes/test_switchbot/
+tests/cassettes/
