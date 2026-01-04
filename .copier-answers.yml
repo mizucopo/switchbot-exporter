@@ -1,0 +1,23 @@
+_commit: 996ede6
+_src_path: git@github.com:mizucopo/repo-template.git
+author_email: mizu.copo@gmail.com
+author_name: みず
+docker_image_name: switchbot-exporter
+docker_registry: mizucopo
+project_dependencies:
+- click>=8.1
+- requests>=2.32
+- inflect>=7.4
+- inflection>=0.5
+- flask>=3.0
+- gunicorn>=23.0
+- python-decouple>=3.8
+project_description: Prometheus SwitchBot Exporter
+project_name: switchbot-exporter
+project_version: 2.0.0
+python_version: '3.14'
+use_aws_ecr: false
+use_gh_actions_docker_release: true
+use_gh_actions_pr_tag_check: true
+use_mit_license: true
+use_python: true

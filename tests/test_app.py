@@ -1,6 +1,6 @@
 import os
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from app import generate_prometheus_response_text
 from config import get_optional_env_var, get_required_env_var
@@ -9,11 +9,10 @@ from switchbot import SwitchbotMetrics
 
 
 class TestApp(unittest.TestCase):
-
-    def setUp(self):
+    def setUp(self) -> None:
         pass
 
-    def test_generate_prometheus_response_text(self):
+    def test_generate_prometheus_response_text(self) -> None:
         metrics = SwitchbotMetrics(
             escape_device_names={
                 "123": "Test Bot",
@@ -37,7 +36,7 @@ class TestApp(unittest.TestCase):
             "DELAY_SECOND": "0.5",
         },
     )
-    def test_app_config_from_env(self):
+    def test_app_config_from_env(self) -> None:
         """環境変数から設定が正しく読み込まれることを確認."""
         # モジュールを再インポートして環境変数を反映
         import importlib
@@ -52,13 +51,13 @@ class TestApp(unittest.TestCase):
         self.assertEqual(app.CACHE_EXPIRE_SECOND, 300)
         self.assertEqual(app.DELAY_SECOND, 0.5)
 
-    def test_required_env_var_missing(self):
+    def test_required_env_var_missing(self) -> None:
         """必須環境変数が未設定の場合に例外が発生することを確認."""
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(UndefinedValueError):
                 get_required_env_var("MISSING_VAR")
 
-    def test_optional_env_var_defaults(self):
+    def test_optional_env_var_defaults(self) -> None:
         """任意環境変数が未設定の場合にデフォルト値が使用されることを確認."""
         with patch.dict(os.environ, {}, clear=True):
             port = get_optional_env_var("SERVER_PORT", 9171, int)
