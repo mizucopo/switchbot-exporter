@@ -162,7 +162,7 @@ class Switchbot:
             devices.append(
                 SwitchbotDevice(
                     device_id=device["deviceId"],
-                    device_type=device["deviceType"],
+                    device_type=device.get("deviceType", "-"),
                     device_name=device["deviceName"],
                 )
             )
