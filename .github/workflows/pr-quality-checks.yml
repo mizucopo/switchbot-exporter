@@ -30,6 +30,9 @@ jobs:
       - name: Run pytest
         id: pytest
         continue-on-error: true
+        env:
+          SWITCHBOT_API_SECRET: ${{ secrets.SWITCHBOT_API_SECRET }}
+          SWITCHBOT_API_TOKEN: ${{ secrets.SWITCHBOT_API_TOKEN }}
         run: |
           if uv run pytest --tb=short --no-header > pytest_output.txt 2>&1; then
             RESULT="✅ 成功"
