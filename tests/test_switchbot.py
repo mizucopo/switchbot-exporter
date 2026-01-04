@@ -1,5 +1,3 @@
-import os
-
 import pytest
 
 from switchbot import Switchbot
@@ -8,8 +6,10 @@ from switchbot import Switchbot
 class TestSwitchbot:
     @pytest.fixture(autouse=True)
     def setup(self) -> None:
-        self.api_token = os.getenv("SWITCHBOT_API_TOKEN", "test_token")
-        self.api_secret = os.getenv("SWITCHBOT_API_SECRET", "test_secret")
+        from tests.conftest import app_config
+
+        self.api_token = app_config("SWITCHBOT_API_TOKEN", default="test_token")
+        self.api_secret = app_config("SWITCHBOT_API_SECRET", default="test_secret")
         self.cache_expire_second = 0
 
         self.switchbot = Switchbot(
