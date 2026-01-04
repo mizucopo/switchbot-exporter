@@ -127,3 +127,6 @@ __pypackages__/
 # Original Additions
 .secrets
 .env
+
+# VCR cassettes
+tests/cassettes/
