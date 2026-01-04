@@ -1,5 +1,4 @@
-"""
-Switchbot.
+"""Switchbot.
 
 Switchbotは、SwitchBot APIと対話するための機能を提供します.
 
@@ -22,8 +21,7 @@ import requests
 
 @dataclass
 class SwitchbotDevice:
-    """
-    SwitchbotDeviceは、Switchbotデバイスのデータを表すクラス.
+    """SwitchbotDeviceは、Switchbotデバイスのデータを表すクラス.
 
     Attributes:
         device_id (str): デバイスの一意の識別子。
@@ -78,8 +76,7 @@ class SwitchbotResponseStatus(TypedDict):
 
 
 class Switchbot:
-    """
-    Switchbotクラスは、SwitchBot APIと対話するための機能を提供します.
+    """Switchbotクラスは、SwitchBot APIと対話するための機能を提供します.
 
     Attributes:
         VERSION (str): クラスのバージョン情報。
@@ -129,8 +126,7 @@ class Switchbot:
         cache_expire_second: int = 600,
         delay_second: float = 1,
     ) -> None:
-        """
-        SwitchBotクラスをAPIトークンとシークレットで初期化します.
+        """SwitchBotクラスをAPIトークンとシークレットで初期化します.
 
         Args:
             api_token (str): 認証用のAPIトークン。
@@ -154,8 +150,7 @@ class Switchbot:
             os.makedirs(self.cache_dir, exist_ok=True)
 
     def fetch_devices(self: "Switchbot") -> list[SwitchbotDevice]:
-        """
-        デバイスデータを取得し、構造化された形式で返します.
+        """デバイスデータを取得し、構造化された形式で返します.
 
         Returns:
             list[SwitchbotDevice]: デバイスデータを含むリスト
@@ -167,7 +162,7 @@ class Switchbot:
             devices.append(
                 SwitchbotDevice(
                     device_id=device["deviceId"],
-                    device_type=device["deviceType"],
+                    device_type=device.get("deviceType", "-"),
                     device_name=device["deviceName"],
                 )
             )
@@ -176,8 +171,7 @@ class Switchbot:
     def fetch_device_status(
         self: "Switchbot", device_id: str
     ) -> SwitchbotResponseStatus:
-        """
-        指定されたデバイスIDのデバイスのステータスを取得し、辞書として返します.
+        """指定されたデバイスIDのデバイスのステータスを取得し、辞書として返します.
 
         Args:
             device_id (str): ステータスを取得するデバイスのID
@@ -194,8 +188,7 @@ class Switchbot:
     def fetch_metrics(
         self: "Switchbot", devices: list[SwitchbotDevice]
     ) -> SwitchbotMetrics:
-        """
-        Fetch metrics for each device and return them in a structured format.
+        """Fetch metrics for each device and return them in a structured format.
 
         Args:
             devices (list): The list of devices.
@@ -226,8 +219,7 @@ class Switchbot:
     def __generate_signature(
         self: "Switchbot", token: str, secret: str
     ) -> tuple[str, str, str]:
-        """
-        トークンとシークレットに基づいて署名、タイムスタンプ、およびノンスを生成して返します.
+        """トークンとシークレットに基づいて署名、タイムスタンプ、およびノンスを生成して返します.
 
         Args:
             token (str): 認証トークン
@@ -251,8 +243,7 @@ class Switchbot:
     def __create_request_header(
         self: "Switchbot", token: str, secret: str
     ) -> dict[str, str]:
-        """
-        トークンとシークレットに基づいてリクエストヘッダーを作成して返します.
+        """トークンとシークレットに基づいてリクエストヘッダーを作成して返します.
 
         Args:
             token (str): 認証トークン
@@ -267,8 +258,7 @@ class Switchbot:
         return headers
 
     def __cache_filename_from_url(self: "Switchbot", url: str) -> str:
-        """
-        指定されたURLに基づいてキャッシュファイル名を生成します.
+        """指定されたURLに基づいてキャッシュファイル名を生成します.
 
         この関数はURLを受け取り、SHA256を使用してURLをハッシュ化することで一意のファイル名に変換します
         生成されたファイル名は、そのURLに対応するキャッシュされたコンテンツを保存するために使用されます
@@ -284,8 +274,7 @@ class Switchbot:
         return os.path.join(self.cache_dir, sha256_hash)
 
     def __save_to_cache(self: "Switchbot", url: str, content: str) -> None:
-        """
-        指定されたURLに対応するキャッシュファイルにコンテンツを保存します.
+        """指定されたURLに対応するキャッシュファイルにコンテンツを保存します.
 
         この関数は、URLから派生したファイル名にコンテンツを書き込みます
         URLに対応するキャッシュファイルが既に存在する場合、それは上書きされます
@@ -299,8 +288,7 @@ class Switchbot:
             cache_file.write(content)
 
     def __load_from_cache(self: "Switchbot", url: str) -> str | None:
-        """
-        指定されたURLに対応するキャッシュファイルからコンテンツを取得します.
+        """指定されたURLに対応するキャッシュファイルからコンテンツを取得します.
 
         この関数は、指定されたURLに関連付けられたキャッシュファイルからコンテンツを読み取ろうとします
         キャッシュファイルが存在しない場合や、キャッシュされたコンテンツが期限切れの場合は、Noneを返します
@@ -309,7 +297,9 @@ class Switchbot:
             url (str): キャッシュされたコンテンツを取得するためのURL
 
         Returns:
-            str: 利用可能で期限切れでない場合はキャッシュされたコンテンツ、それ以外の場合はNone
+            str:
+                利用可能で期限切れでない場合はキャッシュされたコンテンツ、
+                それ以外の場合はNone
 
         """
         cache_file = self.__cache_filename_from_url(url)
@@ -321,10 +311,9 @@ class Switchbot:
             return f.read()
 
     def __fetch_with_cache(self: "Switchbot", url: str) -> str:
-        """
-        有効期限が切れていないキャッシュデータを利用してHTTP GETリクエストを実行します.
+        """キャッシュを利用してHTTP GETリクエストを実行します.
 
-        この関数は、指定されたURLに対して有効なキャッシュコンテンツが存在するかどうかを最初に確認します
+        指定されたURLに対して有効なキャッシュコンテンツが存在するかどうかを最初に確認します
         有効なキャッシュコンテンツが見つかった場合、それを返します。そうでない場合は、新しいGETリクエストを行います
         新しいGETリクエストからの成功したレスポンスはキャッシュに保存されます
 
@@ -357,11 +346,11 @@ class Switchbot:
             raise
 
     def __fetch_devices(self: "Switchbot") -> SwitchbotResponseDevices:
-        """
-        デバイスのリストを取得し、辞書として返します.
+        """デバイスのリストを取得し、辞書として返します.
 
         Returns:
-            SwitchbotResponseDevices: デバイスのリストを含む辞書(SwitchBotAPIのレスポンス)
+            SwitchbotResponseDevices:
+                デバイスのリストを含む辞書(SwitchBotAPIのレスポンス)
 
         """
         devices_url = f"{self.BASE_URL}/v1.1/devices"

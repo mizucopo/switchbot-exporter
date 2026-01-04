@@ -116,9 +116,17 @@ cover/
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow
 __pypackages__/
 
+### uv virtual environments ###
+.venv/
+.venv
+
 
 # End of https://www.toptal.com/developers/gitignore/api/pythonvanilla,macos,linux
 
 
 # Original Additions
 .secrets
+.env
+
+# VCR cassettes
+tests/cassettes/

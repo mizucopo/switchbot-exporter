@@ -1,40 +1,17 @@
-"""
-Prometheusカスタムエクスポーターを提供します.
+"""Prometheusカスタムエクスポーターを提供します.
 
 メインのエントリポイントとして、CLIで起動できる `exporter` 関数を含んでいます。
 """
 
-import os
-
 import click
 from flask import Flask, Response
 
+from config import get_optional_env_var, get_required_env_var
 from switchbot import Switchbot, SwitchbotMetrics
 
 
-def get_required_env_var(name: str) -> str:
-    """
-    必須の環境変数を取得します.
-
-    Args:
-        name (str): 環境変数名。
-
-    Returns:
-        str: 環境変数の値。
-
-    Raises:
-        ValueError: 必須の環境変数が設定されていない場合
-
-    """
-    value = os.getenv(name)
-    if value is None:
-        raise ValueError(f"必須の環境変数 '{name}' が設定されていません。")
-    return value
-
-
 def generate_prometheus_response_text(metrics: SwitchbotMetrics) -> str:
-    """
-    Prometheusのメトリクスのレスポンステキストを生成します.
+    """Prometheusのメトリクスのレスポンステキストを生成します.
 
     Args:
         metrics (dict): メトリクスデータ。
@@ -48,59 +25,90 @@ def generate_prometheus_response_text(metrics: SwitchbotMetrics) -> str:
         "# TYPE switchbot_device_battery gauge\n"
     )
     for device_id, battery in metrics.batteries.items():
-        response_text += f'switchbot_device_battery{{device_id="{device_id}",device_name="{metrics.escape_device_names[device_id]}"}} {battery}\n'
+        labels = (
+            f'device_id="{device_id}",'
+            f'device_name="{metrics.escape_device_names[device_id]}"'
+        )
+        response_text += f"switchbot_device_battery{{{labels}}} {battery}\n"
 
     response_text += (
         "# HELP switchbot_device_humidity SwitchBot Humidity\n"
         "# TYPE switchbot_device_humidity gauge\n"
     )
     for device_id, humidity in metrics.humidities.items():
-        response_text += f'switchbot_device_humidity{{device_id="{device_id}",device_name="{metrics.escape_device_names[device_id]}"}} {humidity}\n'
+        labels = (
+            f'device_id="{device_id}",'
+            f'device_name="{metrics.escape_device_names[device_id]}"'
+        )
+        response_text += f"switchbot_device_humidity{{{labels}}} {humidity}\n"
 
     response_text += (
         "# HELP switchbot_device_temperature SwitchBot Temperature\n"
         "# TYPE switchbot_device_temperature gauge\n"
     )
     for device_id, temperature in metrics.temperatures.items():
-        response_text += f'switchbot_device_temperature{{device_id="{device_id}",device_name="{metrics.escape_device_names[device_id]}"}} {temperature}\n'
+        labels = (
+            f'device_id="{device_id}",'
+            f'device_name="{metrics.escape_device_names[device_id]}"'
+        )
+        response_text += f"switchbot_device_temperature{{{labels}}} {temperature}\n"
 
     response_text += (
-        "# HELP switchbot_device_co2 SwitchBot CO2\n"
-        "# TYPE switchbot_device_co2 gauge\n"
+        "# HELP switchbot_device_co2 SwitchBot CO2\n# TYPE switchbot_device_co2 gauge\n"
     )
     for device_id, co2 in metrics.co2s.items():
-        response_text += f'switchbot_device_co2{{device_id="{device_id}",device_name="{metrics.escape_device_names[device_id]}"}} {co2}\n'
+        labels = (
+            f'device_id="{device_id}",'
+            f'device_name="{metrics.escape_device_names[device_id]}"'
+        )
+        response_text += f"switchbot_device_co2{{{labels}}} {co2}\n"
 
     response_text += (
         "# HELP switchbot_device_voltage SwitchBot Voltage\n"
         "# TYPE switchbot_device_voltage gauge\n"
     )
     for device_id, voltage in metrics.voltages.items():
-        response_text += f'switchbot_device_voltage{{device_id="{device_id}",device_name="{metrics.escape_device_names[device_id]}"}} {voltage}\n'
+        labels = (
+            f'device_id="{device_id}",'
+            f'device_name="{metrics.escape_device_names[device_id]}"'
+        )
+        response_text += f"switchbot_device_voltage{{{labels}}} {voltage}\n"
 
     response_text += (
         "# HELP switchbot_device_weight SwitchBot Weight\n"
         "# TYPE switchbot_device_weight gauge\n"
     )
     for device_id, weight in metrics.weights.items():
-        response_text += f'switchbot_device_weight{{device_id="{device_id}",device_name="{metrics.escape_device_names[device_id]}"}} {weight}\n'
+        labels = (
+            f'device_id="{device_id}",'
+            f'device_name="{metrics.escape_device_names[device_id]}"'
+        )
+        response_text += f"switchbot_device_weight{{{labels}}} {weight}\n"
 
     response_text += (
         "# HELP switchbot_device_electric_current SwitchBot ElectricCurrent\n"
         "# TYPE switchbot_device_electric_current gauge\n"
     )
     for device_id, electric_current in metrics.electric_currents.items():
-        response_text += f'switchbot_device_electric_current{{device_id="{device_id}",device_name="{metrics.escape_device_names[device_id]}"}} {electric_current}\n'
+        labels = (
+            f'device_id="{device_id}",'
+            f'device_name="{metrics.escape_device_names[device_id]}"'
+        )
+        response_text += (
+            f"switchbot_device_electric_current{{{labels}}} {electric_current}\n"
+        )
 
     return response_text.strip()
 
 
+# python-decouple を使用して環境変数を取得
+# .env ファイルはプロジェクトルートを検索
 SWITCHBOT_API_TOKEN = get_required_env_var("SWITCHBOT_API_TOKEN")
 SWITCHBOT_API_SECRET = get_required_env_var("SWITCHBOT_API_SECRET")
-SERVER_PORT = int(os.getenv("SERVER_PORT", 9171))
-CACHE_DIR = os.getenv("CACHE_DIR", "/tmp/switchbot")
-CACHE_EXPIRE_SECOND = int(os.getenv("CACHE_EXPIRE_SECOND", 600))
-DELAY_SECOND = float(os.getenv("DELAY_SECOND", 1))
+SERVER_PORT: int = get_optional_env_var("SERVER_PORT", 9171, int)  # type: ignore
+CACHE_DIR: str = get_optional_env_var("CACHE_DIR", "/tmp/switchbot", str)  # type: ignore
+CACHE_EXPIRE_SECOND: int = get_optional_env_var("CACHE_EXPIRE_SECOND", 600, int)  # type: ignore
+DELAY_SECOND: float = get_optional_env_var("DELAY_SECOND", 1, float)  # type: ignore
 
 app = Flask(__name__)
 switchbot = Switchbot(
@@ -114,8 +122,7 @@ switchbot = Switchbot(
 
 @app.route("/metrics", methods=["GET"])
 def http_metrics() -> Response:
-    """
-    PrometheusのメトリクスのHTTPリクエストを処理します.
+    """PrometheusのメトリクスのHTTPリクエストを処理します.
 
     Returns:
         Response: HTTPレスポンス。

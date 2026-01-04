@@ -3,7 +3,9 @@
 Prometheus のカスタムエクスポーターです。
 Switchbot のステータスを取得します。
 
-## 利用方法
+## 利用方法（配布）
+
+Switchbot Exporter は Docker イメージとして配布されます。以下の手順でデプロイできます。
 
 1. docker image を pull する
 
@@ -32,56 +34,56 @@ docker run --rm -d \
 
 ## 開発手順
 
-開発環境は docker コンテナになります
+Switchbot Exporter のローカル開発は uv が管理する Python 仮想環境を標準としています。Docker は配布検証やオプションの代替手段として利用できます。
 
-1. secrets.example を複製し、ファイル名を .secrets に変更します
-2. .secrets を編集します
-3. docker image のビルドを行います
+### 前提ソフトウェア
+
+- Python 3.13
+- [uv CLI](https://docs.astral.sh/uv/)
+
+### セットアップ
 
 ```sh
-docker compose build
+uv venv .venv
+source .venv/bin/activate
+uv pip sync uv.lock uv.dev.lock
 ```
 
-5. docker コンテナを立ち上げます
+必要な環境変数はリポジトリルートの `env.example` を `.env` にコピーして編集します。
+python-decouple が自動的に `.env` ファイルを読み込むため、手動での環境変数読み込みは不要です。
 
 ```sh
-docker run --rm -it \
-  -v $(pwd)/docker:/app \
+cp env.example .env
+# .env を編集して実際の値を設定
+```
+
+`.env` ファイルはプロジェクトルートに配置することで、自動的に読み込まれます。
+
+### 開発コマンド
+
+```sh
+pytest tests
+mypy --pretty src
+ruff check src
+black src tests
+```
+
+uv 仮想環境を利用していれば `poetry run` や Docker 特有のボリュームマウントは不要です。詳細は [AGENTS.md](./AGENTS.md) を参照してください。
+
+### Docker を利用した動作確認（任意）
+
+Docker での動作確認が必要な場合は `Dockerfile` を用いてコンテナをビルドできます。配布時と同じパッケージング形態で検証することを意図しています。
+
+```sh
+docker build -t mizucopo/switchbot-exporter:develop .
+docker run --rm -d \
   -p 9171:9171 \
   -e SWITCHBOT_API_TOKEN=test_api_token \
   -e SWITCHBOT_API_SECRET=test_api_secret \
-  mizucopo/switchbot-exporter:develop \
-  /bin/sh
+  mizucopo/switchbot-exporter:develop
 ```
 
-6. ソースコードを編集します
-7. テストの実行をします
-
-```sh
-poetry run pytest ./tests
-```
-
-8. フォーマットの確認をします
-
-```sh
-poetry run mypy --pretty ./src
-```
-
-```sh
-poetry run ruff check ./src
-```
-
-```sh
-poetry run black ./src ./tests
-```
-
-9. ビルドテストを実行します
-
-```sh
-act -j build-and-push
-```
-
-10. GitHub へプルリクエストを行います
+起動後は `http://localhost:9171/metrics` にアクセスしてエクスポーターの挙動を確認できます。ローカル開発は uv 仮想環境で行い、Docker は配布および最終検証のために利用します。
 
 ## Contact
 

@@ -1,0 +1,59 @@
+[project]
+name = "switchbot-exporter"
+version = "2.0.0"
+description = "Prometheus SwitchBot Exporter"
+authors = [
+    {name = "みず", email = "mizu.copo@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "click>=8.1",
+    "requests>=2.32",
+    "inflect>=7.4",
+    "inflection>=0.5",
+    "flask>=3.0",
+    "gunicorn>=23.0",
+    "python-decouple>=3.8",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "pytest>=9.0.2",
+    "pytest-mock>=3.15.1",
+    "pytest-recording>=0.13.4",
+    "python-decouple-stubs>=0.1",
+    "ruff>=0.14.10",
+    "taskipy>=1.14.1",
+    "types-requests>=2.32.4.20250913",
+    "vcrpy>=8.1.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "ARG", "D"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/cloud_storage_provider.py" = ["ARG002"]
+"src/backup_provider.py" = ["ARG002"]
+"tests/**/*.py" = ["D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.mypy]
+strict = true
+python_version = "3.14"
+files = ["src", "tests", "stubs"]
+mypy_path = "src:stubs"
+
+[tool.taskipy.tasks]
+test = "ruff check --fix src tests stubs && ruff format src tests stubs && mypy && pytest"
