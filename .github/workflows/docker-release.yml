@@ -321,17 +321,17 @@ jobs:
 
       - name: Set up Docker Buildx
         if: steps.image-state.outputs.version_exists != 'true' || steps.image-state.outputs.latest_matches != 'true'
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Login to Docker Hub
         if: steps.image-state.outputs.version_exists != 'true' || steps.image-state.outputs.latest_matches != 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: "mizucopo"
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push
         if: steps.image-state.outputs.version_exists != 'true'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
