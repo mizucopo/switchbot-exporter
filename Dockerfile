@@ -19,7 +19,7 @@ COPY src ./
 
 RUN apk add --no-cache gcc python3-dev musl-dev linux-headers \
   && pip install --no-cache-dir uv \
-  && uv sync --frozen \
+  && uv sync --frozen --no-install-project \
   && rm -rf /root/.cache/uv
 
 CMD [".venv/bin/gunicorn", "-w", "4", "-b", "0.0.0.0:9171", "--timeout", "180", "--chdir", "/app", "app:app"]
