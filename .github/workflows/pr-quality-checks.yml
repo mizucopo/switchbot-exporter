@@ -34,7 +34,12 @@ jobs:
           SWITCHBOT_API_SECRET: ${{ secrets.SWITCHBOT_API_SECRET }}
           SWITCHBOT_API_TOKEN: ${{ secrets.SWITCHBOT_API_TOKEN }}
         timeout-minutes: 10
-        run: uv run pytest --tb=short -v
+        run: |
+          if [ -n "$SWITCHBOT_API_TOKEN" ] && [ -n "$SWITCHBOT_API_SECRET" ]; then
+            uv run pytest --tb=short -v
+          else
+            uv run pytest --tb=short -v -m "not vcr"
+          fi
 
       - name: Run mypy
         id: mypy
