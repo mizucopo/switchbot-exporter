@@ -1,6 +1,6 @@
 [project]
 name = "switchbot-exporter"
-version = "2.0.6"
+version = "2.0.7"
 description = "Prometheus SwitchBot Exporter"
 authors = [
     {name = "みず", email = "mizu.copo@gmail.com"}
@@ -27,7 +27,7 @@ dev = [
     "ruff>=0.14.10",
     "taskipy>=1.14.1",
     "types-requests>=2.32.4.20250913",
-    "vcrpy>=8.1.0",
+    "vcrpy>=8.2.1",
     "vulture>=2.14",
 ]
 
