@@ -1,6 +1,6 @@
 [project]
 name = "switchbot-exporter"
-version = "2.0.4"
+version = "2.0.5"
 description = "Prometheus SwitchBot Exporter"
 authors = [
     {name = "みず", email = "mizu.copo@gmail.com"}
