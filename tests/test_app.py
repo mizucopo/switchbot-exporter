@@ -2,9 +2,10 @@ import os
 import unittest
 from unittest.mock import patch
 
+from decouple import UndefinedValueError
+
 from app import generate_prometheus_response_text
 from config import get_optional_env_var, get_required_env_var
-from decouple import UndefinedValueError
 from switchbot import SwitchbotMetrics
 
 
@@ -40,6 +41,7 @@ class TestApp(unittest.TestCase):
         """環境変数から設定が正しく読み込まれることを確認."""
         # モジュールを再インポートして環境変数を反映
         import importlib
+
         import app
 
         importlib.reload(app)
@@ -53,9 +55,11 @@ class TestApp(unittest.TestCase):
 
     def test_required_env_var_missing(self) -> None:
         """必須環境変数が未設定の場合に例外が発生することを確認."""
-        with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaises(UndefinedValueError):
-                get_required_env_var("MISSING_VAR")
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            self.assertRaises(UndefinedValueError),
+        ):
+            get_required_env_var("MISSING_VAR")
 
     def test_optional_env_var_defaults(self) -> None:
         """任意環境変数が未設定の場合にデフォルト値が使用されることを確認."""
