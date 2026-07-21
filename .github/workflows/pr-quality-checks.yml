@@ -2,30 +2,30 @@ name: PR Quality Checks
 
 on:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   quality-checks:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        id: setup-python
+        uses: actions/setup-python@v7
         with:
-          python-version: '3.14'
+          python-version-file: ".python-version"
 
-      - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --locked
 
       - name: Run pytest
         id: pytest
@@ -33,59 +33,74 @@ jobs:
         env:
           SWITCHBOT_API_SECRET: ${{ secrets.SWITCHBOT_API_SECRET }}
           SWITCHBOT_API_TOKEN: ${{ secrets.SWITCHBOT_API_TOKEN }}
+        timeout-minutes: 10
         run: |
-          if uv run pytest --tb=short --no-header > pytest_output.txt 2>&1; then
-            RESULT="✅ 成功"
+          if [ -n "$SWITCHBOT_API_TOKEN" ] && [ -n "$SWITCHBOT_API_SECRET" ]; then
+            uv run pytest --tb=short -v
           else
-            RESULT="❌ 失敗"
+            uv run pytest --tb=short -v -m "not vcr"
           fi
-          echo "result=$RESULT" >> $GITHUB_OUTPUT
 
       - name: Run mypy
         id: mypy
         continue-on-error: true
-        run: |
-          if uv run mypy . > mypy_output.txt 2>&1; then
-            RESULT="✅ 成功"
-          else
-            RESULT="❌ 失敗"
-          fi
-          echo "result=$RESULT" >> $GITHUB_OUTPUT
+        run: uv run mypy
 
       - name: Run ruff format check
         id: ruff-format
         continue-on-error: true
-        run: |
-          if uv run ruff format --check . > ruff_format_output.txt 2>&1; then
-            RESULT="✅ 成功"
-          else
-            RESULT="❌ 失敗"
-          fi
-          echo "result=$RESULT" >> $GITHUB_OUTPUT
+        run: uv run ruff format --check .
 
       - name: Run ruff check
         id: ruff-check
         continue-on-error: true
-        run: |
-          if uv run ruff check . > ruff_check_output.txt 2>&1; then
-            RESULT="✅ 成功"
-          else
-            RESULT="❌ 失敗"
-          fi
-          echo "result=$RESULT" >> $GITHUB_OUTPUT
+        run: uv run ruff check .
 
-      - name: Comment on PR
-        if: github.event.pull_request.head.repo.fork == false
+      - name: Build quality check summary
+        id: quality-report
+        if: ${{ !cancelled() }}
         env:
-          GH_TOKEN: ${{ github.token }}
+          PYTEST_OUTCOME: ${{ steps.pytest.outcome }}
+          MYPY_OUTCOME: ${{ steps.mypy.outcome }}
+          RUFF_FORMAT_OUTCOME: ${{ steps.ruff-format.outcome }}
+          RUFF_CHECK_OUTCOME: ${{ steps.ruff-check.outcome }}
         run: |
-          gh pr comment ${{ github.event.number }} --body "
-          ## 🔍 Quality Checks Result
+          format_result() {
+            case "$1" in
+              success) printf '✅ 成功' ;;
+              failure) printf '❌ 失敗' ;;
+              skipped) printf '⏭️ スキップ' ;;
+              *) printf '❓ %s' "${1:-unknown}" ;;
+            esac
+          }
+
+          cat > quality_report.md <<EOF
+          ## Quality Checks Result
 
           | Item | Result |
           |-------------|------|
-          | pytest | ${{ steps.pytest.outputs.result }} |
-          | mypy | ${{ steps.mypy.outputs.result }} |
-          | ruff format | ${{ steps.ruff-format.outputs.result }} |
-          | ruff check | ${{ steps.ruff-check.outputs.result }} |
-          "
+          | pytest | $(format_result "$PYTEST_OUTCOME") |
+          | mypy | $(format_result "$MYPY_OUTCOME") |
+          | ruff format | $(format_result "$RUFF_FORMAT_OUTCOME") |
+          | ruff check | $(format_result "$RUFF_CHECK_OUTCOME") |
+          EOF
+
+          cat quality_report.md >> "$GITHUB_STEP_SUMMARY"
+
+          HAS_FAILURE=false
+          for outcome in \
+            "$PYTEST_OUTCOME" \
+            "$MYPY_OUTCOME" \
+            "$RUFF_FORMAT_OUTCOME" \
+            "$RUFF_CHECK_OUTCOME"; do
+            if [ "$outcome" != "success" ]; then
+              HAS_FAILURE=true
+            fi
+          done
+          echo "has-failure=$HAS_FAILURE" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce quality gate result
+        if: ${{ !cancelled() && steps.quality-report.outputs.has-failure == 'true' }}
+        run: |
+          echo "::error::One or more quality checks failed or were skipped."
+          exit 1
