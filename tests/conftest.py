@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 from decouple import AutoConfig
 
-
 # python-decoupleを使用して.envファイルを読み込む
 # プロジェクトルートを検索パスとして設定
 search_path = Path(__file__).parent.parent
