@@ -88,8 +88,8 @@ def docker_hub_environment(tmp_path: Path) -> dict[str, str]:
 def test_public_repository_is_checked_without_credentials(tmp_path: Path) -> None:
     """公開リポジトリが認証情報なしで確認されること。
 
-    Arrange: 匿名pull tokenと未使用タグを返すregistry APIが用意される。
-    Act: 認証情報なしでDocker Hub image tag確認stepが実行される。
+    Arrange: 匿名pull tokenと未使用タグを返すregistry APIが用意されること。
+    Act: 認証情報なしでDocker Hub image tag確認stepが実行されること。
     Assert: image tagが未使用として報告されること。
     """
     # Arrange
@@ -111,8 +111,8 @@ def test_public_repository_is_checked_without_credentials(tmp_path: Path) -> Non
 def test_anonymous_token_failure_fails_closed(tmp_path: Path) -> None:
     """匿名pull tokenを取得できない場合にfail-closedとなること。
 
-    Arrange: token要求に失敗するDocker Hub APIが用意される。
-    Act: 認証情報なしでDocker Hub image tag確認stepが実行される。
+    Arrange: token要求に失敗するDocker Hub APIが用意されること。
+    Act: 認証情報なしでDocker Hub image tag確認stepが実行されること。
     Assert: stepが失敗し、タグの未使用が報告されないこと。
     """
     # Arrange
