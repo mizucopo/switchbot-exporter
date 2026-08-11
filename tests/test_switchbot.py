@@ -6,8 +6,8 @@ from switchbot import Switchbot, SwitchbotDevice
 def test_fetch_devices_maps_api_response() -> None:
     """APIのdevice responseがdomain objectへ変換されること.
 
-    Arrange: SwitchBot API responseを返すHTTP boundaryを用意する。
-    Act: device一覧を取得する。
+    Arrange: SwitchBot API responseを返すHTTP boundaryが用意されること。
+    Act: device一覧が取得されること。
     Assert: deviceの識別子・種類・名前が変換されること。
     """
     # Arrange
@@ -37,8 +37,8 @@ def test_fetch_devices_maps_api_response() -> None:
 def test_fetch_device_status_maps_api_response() -> None:
     """APIのstatus responseが返されること.
 
-    Arrange: battery statusを返すHTTP boundaryを用意する。
-    Act: 指定deviceのstatusを取得する。
+    Arrange: battery statusを返すHTTP boundaryが用意されること。
+    Act: 指定deviceのstatusが取得されること。
     Assert: response bodyが保持されること。
     """
     # Arrange
@@ -58,8 +58,8 @@ def test_fetch_device_status_maps_api_response() -> None:
 def test_fetch_metrics_uses_device_status() -> None:
     """対応deviceのstatusがPrometheus metricへ集約されること.
 
-    Arrange: Meter deviceと取得済みstatusを用意する。
-    Act: device一覧からmetricを生成する。
+    Arrange: Meter deviceと取得済みstatusが用意されること。
+    Act: device一覧からmetricが生成されること。
     Assert: battery・humidity・temperatureがdevice IDへ対応すること。
     """
     # Arrange
