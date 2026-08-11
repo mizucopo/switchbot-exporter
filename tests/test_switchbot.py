@@ -1,52 +1,82 @@
-import pytest
+from unittest.mock import Mock, patch
 
-from switchbot import Switchbot
+from switchbot import Switchbot, SwitchbotDevice
 
 
-class TestSwitchbot:
-    @pytest.fixture(autouse=True)
-    def setup(self) -> None:
-        from tests.conftest import app_config
+def test_fetch_devices_maps_api_response() -> None:
+    """APIのdevice responseがdomain objectへ変換されること.
 
-        self.api_token = app_config("SWITCHBOT_API_TOKEN", default="test_token")
-        self.api_secret = app_config("SWITCHBOT_API_SECRET", default="test_secret")
-        self.cache_expire_second = 0
+    Arrange: SwitchBot API responseを返すHTTP boundaryを用意する。
+    Act: device一覧を取得する。
+    Assert: deviceの識別子・種類・名前が変換されること。
+    """
+    # Arrange
+    response = Mock()
+    response.text = (
+        '{"body":{"deviceList":[{"deviceId":"device-1",'
+        '"deviceType":"Meter","deviceName":"Living Room"}]}}'
+    )
+    client = Switchbot("token", "secret", cache_expire_second=0, delay_second=0)
 
-        self.switchbot = Switchbot(
-            self.api_token,
-            self.api_secret,
-            cache_expire_second=self.cache_expire_second,
+    # Act
+    with patch("switchbot.requests.get", return_value=response) as request:
+        devices = client.fetch_devices()
+
+    # Assert
+    assert devices == [
+        SwitchbotDevice(
+            device_id="device-1",
+            device_type="Meter",
+            device_name="Living Room",
         )
+    ]
+    response.raise_for_status.assert_called_once_with()
+    request.assert_called_once()
 
-    @pytest.mark.vcr(cassette_name="test_fetch_devices")
-    def test_fetch_devices(self) -> None:
-        devices = self.switchbot.fetch_devices()
-        # 実際のAPIレスポンスに基づいて検証
-        assert len(devices) > 0
-        # 最初のデバイスが正しく取得できているか確認
-        first_device = devices[0]
-        assert first_device.device_id is not None
-        assert first_device.device_type is not None
-        assert first_device.device_name is not None
 
-    @pytest.mark.vcr(cassette_name="test_fetch_device_status")
-    def test_fetch_device_status(self) -> None:
-        # fetch_devices() で取得したデバイスを使用
-        devices = self.switchbot.fetch_devices()
-        assert len(devices) > 0
+def test_fetch_device_status_maps_api_response() -> None:
+    """APIのstatus responseが返されること.
 
-        # 最初のデバイスのステータスを取得
-        first_device = devices[0]
-        status = self.switchbot.fetch_device_status(first_device.device_id)
-        assert "body" in status
+    Arrange: battery statusを返すHTTP boundaryを用意する。
+    Act: 指定deviceのstatusを取得する。
+    Assert: response bodyが保持されること。
+    """
+    # Arrange
+    response = Mock()
+    response.text = '{"body":{"battery":88}}'
+    client = Switchbot("token", "secret", cache_expire_second=0, delay_second=0)
 
-    @pytest.mark.vcr(cassette_name="test_fetch_metrics")
-    def test_fetch_metrics(self) -> None:
-        # fetch_devices() で取得したデバイスを使用
-        devices = self.switchbot.fetch_devices()
-        assert len(devices) > 0
+    # Act
+    with patch("switchbot.requests.get", return_value=response):
+        status = client.fetch_device_status("device-1")
 
-        metrics = self.switchbot.fetch_metrics(devices)
-        # 最初のデバイスIDがメトリクスに含まれているか確認
-        first_device = devices[0]
-        assert first_device.device_id in metrics.escape_device_names
+    # Assert
+    assert status == {"body": {"battery": 88}}
+    response.raise_for_status.assert_called_once_with()
+
+
+def test_fetch_metrics_uses_device_status() -> None:
+    """対応deviceのstatusがPrometheus metricへ集約されること.
+
+    Arrange: Meter deviceと取得済みstatusを用意する。
+    Act: device一覧からmetricを生成する。
+    Assert: battery・humidity・temperatureがdevice IDへ対応すること。
+    """
+    # Arrange
+    client = Switchbot("token", "secret", cache_expire_second=0, delay_second=0)
+    device = SwitchbotDevice(
+        device_id="device-1",
+        device_type="Meter",
+        device_name='Living "Room"',
+    )
+    status = {"body": {"battery": 88, "humidity": 45, "temperature": 23.5}}
+
+    # Act
+    with patch.object(client, "fetch_device_status", return_value=status):
+        metrics = client.fetch_metrics([device])
+
+    # Assert
+    assert metrics.escape_device_names == {"device-1": 'Living \\"Room\\"'}
+    assert metrics.batteries == {"device-1": 88}
+    assert metrics.humidities == {"device-1": 45}
+    assert metrics.temperatures == {"device-1": 23.5}
