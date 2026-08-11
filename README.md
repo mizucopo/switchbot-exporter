@@ -62,11 +62,11 @@ cp env.example .env
 ### 開発コマンド
 
 ```sh
-pytest tests
-mypy --pretty src
-ruff check src
-black src tests
+uv run task check
+uv run task fix
 ```
+
+`check` は Ruff、mypy、pytest を実行する非変更の品質確認です。`fix` は Ruff の自動修正とformatを適用します。
 
 uv 仮想環境を利用していれば `poetry run` や Docker 特有のボリュームマウントは不要です。詳細は [AGENTS.md](./AGENTS.md) を参照してください。
 

@@ -3,6 +3,8 @@
 メインのエントリポイントとして、CLIで起動できる `exporter` 関数を含んでいます。
 """
 
+from functools import cache
+
 import click
 from flask import Flask, Response
 
@@ -101,37 +103,35 @@ def generate_prometheus_response_text(metrics: SwitchbotMetrics) -> str:
     return response_text.strip()
 
 
-# python-decouple を使用して環境変数を取得
-# .env ファイルはプロジェクトルートを検索
-SWITCHBOT_API_TOKEN = get_required_env_var("SWITCHBOT_API_TOKEN")
-SWITCHBOT_API_SECRET = get_required_env_var("SWITCHBOT_API_SECRET")
-SERVER_PORT: int = get_optional_env_var("SERVER_PORT", 9171, int)  # type: ignore
-CACHE_DIR: str = get_optional_env_var("CACHE_DIR", "/tmp/switchbot", str)  # type: ignore
-CACHE_EXPIRE_SECOND: int = get_optional_env_var("CACHE_EXPIRE_SECOND", 600, int)  # type: ignore
-DELAY_SECOND: float = get_optional_env_var("DELAY_SECOND", 1, float)  # type: ignore
-
-app = Flask(__name__)
-switchbot = Switchbot(
-    api_token=SWITCHBOT_API_TOKEN,
-    api_secret=SWITCHBOT_API_SECRET,
-    cache_dir=CACHE_DIR,
-    cache_expire_second=CACHE_EXPIRE_SECOND,
-    delay_second=DELAY_SECOND,
-)
+@cache
+def get_switchbot() -> Switchbot:
+    """環境設定から共有SwitchBot clientを生成します."""
+    return Switchbot(
+        api_token=get_required_env_var("SWITCHBOT_API_TOKEN"),
+        api_secret=get_required_env_var("SWITCHBOT_API_SECRET"),
+        cache_dir=str(get_optional_env_var("CACHE_DIR", "/tmp/switchbot", str)),
+        cache_expire_second=int(get_optional_env_var("CACHE_EXPIRE_SECOND", 600, int)),
+        delay_second=float(get_optional_env_var("DELAY_SECOND", 1, float)),
+    )
 
 
-@app.route("/metrics", methods=["GET"])
-def http_metrics() -> Response:
-    """PrometheusのメトリクスのHTTPリクエストを処理します.
+def create_app(switchbot_client: Switchbot | None = None) -> Flask:
+    """認証情報を遅延読込するFlask applicationを生成します."""
+    flask_app = Flask(__name__)
 
-    Returns:
-        Response: HTTPレスポンス。
+    @flask_app.route("/metrics", methods=["GET"])
+    def http_metrics() -> Response:
+        """PrometheusのメトリクスのHTTPリクエストを処理します."""
+        client = switchbot_client or get_switchbot()
+        devices = client.fetch_devices()
+        metrics = client.fetch_metrics(devices)
+        response_text = generate_prometheus_response_text(metrics)
+        return Response(response_text, content_type="text/plain; charset=utf-8")
 
-    """
-    devices = switchbot.fetch_devices()
-    metrics = switchbot.fetch_metrics(devices)
-    response_text = generate_prometheus_response_text(metrics)
-    return Response(response_text, content_type="text/plain; charset=utf-8")
+    return flask_app
+
+
+app = create_app()
 
 
 @click.group()
@@ -143,7 +143,7 @@ def cli() -> None:
 @click.command()
 def devices() -> None:
     """デバイスのリストを取得して表示します."""
-    devices = switchbot.fetch_devices()
+    devices = get_switchbot().fetch_devices()
     click.echo(devices)
 
 
@@ -151,15 +151,16 @@ def devices() -> None:
 @click.argument("device_id")
 def device_status(device_id: str) -> None:
     """指定されたデバイスのステータスを取得して表示します."""
-    status = switchbot.fetch_device_status(device_id)
+    status = get_switchbot().fetch_device_status(device_id)
     click.echo(status)
 
 
 @click.command()
 def metrics() -> None:
     """Prometheusのメトリクスを取得して表示します."""
-    devices = switchbot.fetch_devices()
-    metrics = switchbot.fetch_metrics(devices)
+    client = get_switchbot()
+    devices = client.fetch_devices()
+    metrics = client.fetch_metrics(devices)
     response_text = generate_prometheus_response_text(metrics)
     click.echo(response_text)
 
@@ -167,7 +168,8 @@ def metrics() -> None:
 @click.command()
 def exporter() -> None:
     """Prometheus用のカスタムエクスポーターを起動します."""
-    app.run(host="0.0.0.0", port=SERVER_PORT)
+    server_port = int(get_optional_env_var("SERVER_PORT", 9171, int))
+    app.run(host="0.0.0.0", port=server_port)
 
 
 cli.add_command(devices)
