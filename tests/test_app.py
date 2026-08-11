@@ -4,7 +4,7 @@ from typing import cast
 from unittest.mock import Mock, patch
 
 import pytest
-from decouple import UndefinedValueError
+from decouple import AutoConfig, UndefinedValueError
 
 from app import create_app, generate_prometheus_response_text, get_switchbot
 from config import get_optional_env_var, get_required_env_var
@@ -110,19 +110,22 @@ def test_required_env_var_missing() -> None:
     assert error.type is UndefinedValueError
 
 
-def test_optional_env_var_defaults() -> None:
+def test_optional_env_var_defaults(tmp_path: Path) -> None:
     """任意環境変数が未設定の場合に既定値が返されること.
 
     Arrange: 空の環境変数が用意されること。
-    Act: 任意のserver portが取得されること。
+    Act: projectの.envから分離して任意のserver portが取得されること。
     Assert: 既定portが返されること。
     """
     # Arrange
     environment: dict[str, str] = {}
 
     # Act
-    with patch.dict(os.environ, environment, clear=True):
-        port = get_optional_env_var("SERVER_PORT", 9171, int)
+    with (
+        patch.dict(os.environ, environment, clear=True),
+        patch("config.app_config", AutoConfig(search_path=tmp_path)),
+    ):
+        value = get_optional_env_var("SERVER_PORT", 9171, int)
 
     # Assert
-    assert port == 9171
+    assert value == 9171
