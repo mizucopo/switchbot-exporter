@@ -428,8 +428,17 @@ jobs:
           TAG: ${{ steps.version.outputs.version }}
         run: |
           latest_option="--latest=false"
+          latest_notes=""
           if [ "$PUBLISH_LATEST" = "true" ]; then
             latest_option="--latest"
+            latest_notes="
+
+          Or use the latest tag:
+
+          \`\`\`bash
+          docker pull mizucopo/switchbot-exporter:latest
+          \`\`\`
+          "
           fi
 
           gh release create "$TAG" \
@@ -443,12 +452,7 @@ jobs:
           docker pull mizucopo/switchbot-exporter:$TAG
           \`\`\`
 
-          Or use the latest tag:
-
-          \`\`\`bash
-          docker pull mizucopo/switchbot-exporter:latest
-          \`\`\`
-
+          $latest_notes
           ## Links:
           - [Docker Hub](https://hub.docker.com/r/mizucopo/switchbot-exporter)
           - [Source Code](${{ github.server_url }}/${{ github.repository }}/tree/$TAG)
