@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import cast
 from unittest.mock import Mock, patch
 
@@ -13,8 +14,8 @@ from switchbot import Switchbot, SwitchbotMetrics
 def test_generate_prometheus_response_text() -> None:
     """取得済みメトリクスがPrometheus形式へ変換されること.
 
-    Arrange: SwitchBotメトリクスを用意する。
-    Act: レスポンステキストを生成する。
+    Arrange: SwitchBotメトリクスが用意されること。
+    Act: レスポンステキストが生成されること。
     Assert: 対象デバイスのbattery metricが含まれること。
     """
     # Arrange
@@ -37,8 +38,8 @@ def test_generate_prometheus_response_text() -> None:
 def test_create_app_uses_injected_client() -> None:
     """認証情報なしでも注入済みclientでHTTP応答が生成されること.
 
-    Arrange: SwitchBot clientと取得結果を用意する。
-    Act: application factoryからmetrics endpointを呼び出す。
+    Arrange: SwitchBot clientと取得結果が用意されること。
+    Act: application factoryからmetrics endpointが呼び出されること。
     Assert: 正常応答と取得済みmetricが返されること。
     """
     # Arrange
@@ -58,59 +59,62 @@ def test_create_app_uses_injected_client() -> None:
     assert 'device_id="123"' in response.get_data(as_text=True)
 
 
-def test_get_switchbot_reads_environment_when_first_used() -> None:
+def test_get_switchbot_reads_environment_when_first_used(tmp_path: Path) -> None:
     """SwitchBot client生成時に環境設定が読み込まれること.
 
-    Arrange: 必須・任意の環境変数とclient mockを用意する。
-    Act: 共有SwitchBot clientを初回取得する。
+    Arrange: 必須・任意の環境変数が用意されること。
+    Act: 共有SwitchBot clientが初回取得されること。
     Assert: 読み込まれた設定でclientが生成されること。
     """
     # Arrange
     environment = {
         "SWITCHBOT_API_TOKEN": "test_token",
         "SWITCHBOT_API_SECRET": "test_secret",
-        "CACHE_DIR": "/tmp/test",
+        "CACHE_DIR": str(tmp_path),
         "CACHE_EXPIRE_SECOND": "300",
         "DELAY_SECOND": "0.5",
     }
     get_switchbot.cache_clear()
 
     # Act
-    with (
-        patch.dict(os.environ, environment, clear=True),
-        patch("app.Switchbot") as switchbot_class,
-    ):
+    with patch.dict(os.environ, environment, clear=True):
         client = get_switchbot()
 
     # Assert
-    assert client is switchbot_class.return_value
-    switchbot_class.assert_called_once_with(
-        api_token="test_token",
-        api_secret="test_secret",
-        cache_dir="/tmp/test",
-        cache_expire_second=300,
-        delay_second=0.5,
-    )
+    assert client.api_token == "test_token"
+    assert client.api_secret == "test_secret"
+    assert client.cache_dir == str(tmp_path)
+    assert client.cache_expire_second == 300
+    assert client.delay_second == 0.5
     get_switchbot.cache_clear()
 
 
 def test_required_env_var_missing() -> None:
     """必須環境変数が未設定の場合に例外が送出されること.
 
-    Arrange: 環境変数を空にする。
-    Act: 未設定の必須値を取得する。
+    Arrange: 空の環境変数が用意されること。
+    Act: 未設定の必須値が取得されること。
     Assert: UndefinedValueErrorが送出されること。
     """
-    # Arrange / Act / Assert
-    with patch.dict(os.environ, {}, clear=True), pytest.raises(UndefinedValueError):
+    # Arrange
+    environment: dict[str, str] = {}
+
+    # Act
+    with (
+        patch.dict(os.environ, environment, clear=True),
+        pytest.raises(UndefinedValueError) as error,
+    ):
         get_required_env_var("MISSING_VAR")
+
+    # Assert
+    assert error.type is UndefinedValueError
 
 
 def test_optional_env_var_defaults() -> None:
     """任意環境変数が未設定の場合に既定値が返されること.
 
-    Arrange: 環境変数を空にする。
-    Act: 任意のserver portを取得する。
+    Arrange: 空の環境変数が用意されること。
+    Act: 任意のserver portが取得されること。
     Assert: 既定portが返されること。
     """
     # Arrange
