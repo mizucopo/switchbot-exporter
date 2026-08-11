@@ -51,11 +51,11 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$url" in
-  */repositories/*/)
-    printf '{"is_private": %s}' "$REPOSITORY_IS_PRIVATE" > "$output"
-    printf '%s' "$REPOSITORY_HTTP_STATUS"
+  */token)
+    printf '{"token": "test-token"}' > "$output"
+    printf '%s' "$TOKEN_HTTP_STATUS"
     ;;
-  */tags/*)
+  */manifests/*)
     printf '%s' "$IMAGE_HTTP_STATUS"
     ;;
   *)
@@ -74,14 +74,11 @@ def docker_hub_environment(tmp_path: Path) -> dict[str, str]:
     environment.update(
         {
             "PATH": f"{tmp_path}:{environment['PATH']}",
-            "DOCKERHUB_TOKEN": "",
-            "DOCKERHUB_USERNAME": "mizucopo",
             "DOCKERHUB_NAMESPACE": "mizucopo",
             "DOCKERHUB_REPOSITORY": "switchbot-exporter",
             "VERSION": "2.0.2",
             "GITHUB_OUTPUT": str(tmp_path / "github-output.txt"),
-            "REPOSITORY_IS_PRIVATE": "false",
-            "REPOSITORY_HTTP_STATUS": "200",
+            "TOKEN_HTTP_STATUS": "200",
             "IMAGE_HTTP_STATUS": "404",
         }
     )
@@ -91,7 +88,7 @@ def docker_hub_environment(tmp_path: Path) -> dict[str, str]:
 def test_public_repository_is_checked_without_credentials(tmp_path: Path) -> None:
     """公開リポジトリが認証情報なしで確認されること。
 
-    Arrange: 公開リポジトリと未使用タグを返すDocker Hub APIが用意される。
+    Arrange: 匿名pull tokenと未使用タグを返すregistry APIが用意される。
     Act: 認証情報なしでDocker Hub image tag確認stepが実行される。
     Assert: image tagが未使用として報告されること。
     """
@@ -111,17 +108,17 @@ def test_public_repository_is_checked_without_credentials(tmp_path: Path) -> Non
     assert github_output.read_text() == "exists=false\n"
 
 
-def test_unconfirmed_public_repository_fails_closed(tmp_path: Path) -> None:
-    """公開状態を確認できないリポジトリがfail-closedにされること。
+def test_anonymous_token_failure_fails_closed(tmp_path: Path) -> None:
+    """匿名pull tokenを取得できない場合にfail-closedとなること。
 
-    Arrange: リポジトリ情報を取得できないDocker Hub APIが用意される。
+    Arrange: token要求に失敗するDocker Hub APIが用意される。
     Act: 認証情報なしでDocker Hub image tag確認stepが実行される。
     Assert: stepが失敗し、タグの未使用が報告されないこと。
     """
     # Arrange
     write_fake_curl(tmp_path)
     environment = docker_hub_environment(tmp_path)
-    environment["REPOSITORY_HTTP_STATUS"] = "404"
+    environment["TOKEN_HTTP_STATUS"] = "404"
 
     # Act
     result = subprocess.run(
