@@ -38,15 +38,13 @@ Switchbot Exporter のローカル開発は uv が管理する Python 仮想環�
 
 ### 前提ソフトウェア
 
-- Python 3.13
+- Python 3.14
 - [uv CLI](https://docs.astral.sh/uv/)
 
 ### セットアップ
 
 ```sh
-uv venv .venv
-source .venv/bin/activate
-uv pip sync uv.lock uv.dev.lock
+uv sync
 ```
 
 必要な環境変数はリポジトリルートの `env.example` を `.env` にコピーして編集します。
