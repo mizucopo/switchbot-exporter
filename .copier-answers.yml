@@ -11,7 +11,7 @@ docker_smoke_command: .venv/bin/python --version
 dockerfile_path: Dockerfile
 project_description: Prometheus SwitchBot Exporter
 project_name: switchbot-exporter
-project_version: 2.0.17
+project_version: 2.0.18
 python_project_kind: application
 python_version: '3.14'
 use_aws_ecr: false
