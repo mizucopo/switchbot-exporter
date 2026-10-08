@@ -38,6 +38,6 @@
   - In the function body, use `# Arrange`, `# Act`, and `# Assert` section dividers.
 - Describe each test in a Japanese docstring using passive `〜こと` phrasing consistently, including the title and each step.
 
-## Temporary template exception
+## Python application layout
 
-- The flat Python application imports modules directly from `src/`. Omit the template-generated `src/__init__.py` and `tests/test_import.py` until `mizucopo/repo-template#105` supplies a version that passes `uv run task check` for this layout. Refs mizucopo/repo-template#105.
+- The flat Python application imports modules directly from `src/`. Use the template-provided application layout, mypy discovery settings, and `tests/run_pytest.py` runner. The previous temporary exception for `src/__init__.py` and `tests/test_import.py` was resolved by `mizucopo/repo-template#105`.
