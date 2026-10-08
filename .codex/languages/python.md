@@ -1,6 +1,6 @@
 # Python guidance
 
-Run the Python quality gate from the repository root:
+Python is used only by release-controller regression tooling. Run its quality gate from the repository root in addition to the Rust gate:
 
 ```bash
 uv run task check

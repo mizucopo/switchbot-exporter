@@ -14,6 +14,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Run Rust quality gate
+        timeout-minutes: 15
+        run: |
+          cargo fmt --all --check
+          cargo clippy --locked --all-targets --all-features -- -D warnings
+          cargo test --locked --all-targets --all-features
+          cargo build --release --locked
+
       - name: Set up Python
         id: setup-python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -27,6 +38,6 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
-      - name: Run quality gate
+      - name: Run release-controller regression quality gate
         timeout-minutes: 15
         run: uv run task check
