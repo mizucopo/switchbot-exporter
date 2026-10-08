@@ -1,4 +1,9 @@
-use std::{collections::HashMap, fs, path::Path, time::Duration};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use anyhow::{Context, Result, bail};
 
@@ -12,6 +17,7 @@ pub struct Config {
     pub cache_ttl: Duration,
     pub delay: Duration,
     pub api_timeout: Duration,
+    pub ca_bundle: Option<PathBuf>,
 }
 
 impl Config {
@@ -39,6 +45,11 @@ impl Config {
             cache_ttl: Duration::from_secs(ttl.max(0) as u64),
             delay,
             api_timeout,
+            ca_bundle: values
+                .get("REQUESTS_CA_BUNDLE")
+                .filter(|path| !path.is_empty())
+                .or_else(|| values.get("CURL_CA_BUNDLE").filter(|path| !path.is_empty()))
+                .map(PathBuf::from),
         })
     }
 }
@@ -82,7 +93,12 @@ pub fn load_values(directory: &Path) -> Result<Values> {
             Err(error) => return Err(error).context("Could not read .env"),
         }
     }
-    values.extend(std::env::vars());
+    // 設定と無関係な非UTF-8の環境変数でプロセス全体をpanicさせない。
+    values.extend(
+        std::env::vars_os().filter_map(|(name, value)| {
+            Some((name.into_string().ok()?, value.into_string().ok()?))
+        }),
+    );
     Ok(values)
 }
 

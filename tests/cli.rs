@@ -94,3 +94,61 @@ fn missing_device_status_id_is_reported_before_loading_credentials() {
     assert!(error.contains("<DEVICE_ID>"));
     assert!(!error.contains("SWITCHBOT_API_TOKEN"));
 }
+
+/// 関係のない非 UTF-8 環境値でも通常の設定エラーが返されること。
+/// Arrange: 子プロセスだけに非 UTF-8 値と不正な SERVER_PORT が設定されること。
+/// Act: exporter の設定が読み込まれること。
+/// Assert: 環境列挙が panic せず、port の通常エラーが返されること。
+#[cfg(unix)]
+#[test]
+fn unrelated_non_utf8_environment_value_does_not_panic() {
+    use std::{ffi::OsString, os::unix::ffi::OsStringExt};
+
+    // Arrange
+    let mut command = Command::new(env!("CARGO_BIN_EXE_switchbot-exporter"));
+    command
+        .args(["exporter"])
+        .env_clear()
+        .env("SERVER_PORT", "invalid-port")
+        .env(
+            "UNRELATED_BINARY_VALUE",
+            OsString::from_vec(vec![0xff, 0xfe]),
+        );
+
+    // Act
+    let output = command.output().unwrap();
+
+    // Assert
+    assert!(!output.status.success());
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(error.contains("SERVER_PORT"), "{error}");
+    assert!(!error.contains("panicked"), "{error}");
+    assert!(!error.contains("VarError"), "{error}");
+}
+
+/// 関係のない非 UTF-8 環境キーでも通常の認証設定エラーが返されること。
+/// Arrange: 子プロセスだけに非 UTF-8 キーと認証値のない環境が設定されること。
+/// Act: metrics の設定が読み込まれること。
+/// Assert: 環境列挙が panic せず、必須認証値の通常エラーが返されること。
+#[cfg(unix)]
+#[test]
+fn unrelated_non_utf8_environment_key_does_not_panic() {
+    use std::{ffi::OsString, os::unix::ffi::OsStringExt};
+
+    // Arrange
+    let mut command = Command::new(env!("CARGO_BIN_EXE_switchbot-exporter"));
+    command
+        .args(["metrics"])
+        .env_clear()
+        .env(OsString::from_vec(vec![b'U', b'N', 0xff]), "unrelated");
+
+    // Act
+    let output = command.output().unwrap();
+
+    // Assert
+    assert!(!output.status.success());
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(error.contains("SWITCHBOT_API_TOKEN"), "{error}");
+    assert!(!error.contains("panicked"), "{error}");
+    assert!(!error.contains("VarError"), "{error}");
+}

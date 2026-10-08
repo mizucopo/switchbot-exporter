@@ -1,9 +1,9 @@
-use std::{collections::HashMap, time::SystemTime};
+use std::{collections::HashMap, fs, time::SystemTime};
 
 use anyhow::{Context, Result, bail};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use hmac::{Hmac, Mac};
-use reqwest::{Client, Url, header::HeaderValue};
+use reqwest::{Certificate, Client, Url, header::HeaderValue};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::Sha256;
@@ -59,9 +59,20 @@ impl Switchbot {
 
     /// テストではローカルHTTP境界を注入する。CLIから接続先は変更しない。
     pub fn with_base_url(config: Config, base_url: Url) -> Result<Self> {
-        let http = Client::builder()
+        let mut builder = Client::builder()
             .timeout(config.api_timeout)
-            .redirect(reqwest::redirect::Policy::none())
+            .redirect(reqwest::redirect::Policy::none());
+        if let Some(path) = &config.ca_bundle {
+            let pem = fs::read(path).context("Could not read configured CA bundle")?;
+            let certificates =
+                Certificate::from_pem_bundle(&pem).context("Invalid configured PEM CA bundle")?;
+            if certificates.is_empty() {
+                bail!("Configured CA bundle contains no certificates");
+            }
+            // RequestsのCA overrideと同じく、指定したbundleのみを信頼する。
+            builder = builder.tls_certs_only(certificates);
+        }
+        let http = builder
             .build()
             .context("Could not initialize HTTP client")?;
         Ok(Self {

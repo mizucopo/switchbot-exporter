@@ -7,6 +7,7 @@ Issue #60 の最新依頼に従い、比較試作ではなく Python runtime を
 - `/metrics` は `text/plain; charset=utf-8`、GET / HEAD / OPTIONS に対応します。失敗時は HTTP 500、未知の path は 404、未対応 method は 405 です。
 - token / secret と既存の環境変数名・既定値、環境変数優先の `.env` 設定を維持します。空の `CACHE_DIR`、0 以下の TTL は cache 無効です。
 - SwitchBot API v1.1 の GET endpoint、HMAC-SHA256 / Base64 署名、millisecond timestamp、空 nonce、デバイス一覧順を維持します。
+- プロセス環境の `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY`（小文字表記も可）を維持します。独自 CA は `REQUESTS_CA_BUNDLE`、未設定または空なら `CURL_CA_BUNDLE` の PEM bundle を使用し、証明書・hostname の検証を維持します。
 - 一覧 CLI はすべての physical `deviceList` を返し、metrics 取得時だけ下記機種を選別します。infrared remote list は取得対象外です。
 - 各 URL ごとの TTL、cache hit 時の待機省略、成功した実リクエスト後の `DELAY_SECOND` を維持します。retry、期限切れデータへの fallback、部分成功は行いません。
 - 数値の単位・scale は変更せず、欠落 metric は省略します。sample がなくても全 family の HELP / TYPE を出力します。label は `device_id` / `device_name`、すべて gauge です。
@@ -35,5 +36,6 @@ family と sample の順序も維持します。HTTP 本文に末尾改行を付
 6. API の `statusCode` が存在して 100 以外の場合は取得失敗とします。不正JSONや失敗 statusCode は cache に保存しません。metric が数値でない場合も HTTP 500 にします。
 7. label 内の引用符・バックスラッシュ・改行を正しい Prometheus escape に変換します。従来の引用符だけの変換で不正だった名前は有効な label として出力されます。
 8. `SERVER_PORT` は Docker の既定起動にも適用します。port を変更した場合は host 側の port mapping と Prometheus の scrape target も合わせて変更してください。
+9. 独自 CA 設定は PEM bundle ファイルを指定してください。旧 Requests が対応していた OpenSSL hash directory は、必要な CA 証明書をまとめた PEM bundle へ変換して同じ環境変数に指定します。不正・空・読込不能な bundle は取得失敗になります。
 
 採番は `release:major` 分類を持つ PR のマージ後に既存 Actions が行います。移植 PR では現在の version `2.0.21` を `Cargo.toml` と `Cargo.lock` に移し、手動で次の番号を設定しません。マージ・製品公開・デプロイはこの実装作業には含みません。
