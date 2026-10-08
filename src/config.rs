@@ -33,8 +33,9 @@ pub struct Config {
 
 impl Config {
     pub fn load(directory: &Path) -> Result<Self> {
-        Self::from_values(&load_values_with_validation(directory, |name| {
+        Self::from_values(&load_values_with_validation(directory, |name, values| {
             API_SETTINGS.contains(&name)
+                && (name != "CURL_CA_BUNDLE" || value(values, "REQUESTS_CA_BUNDLE", "").is_empty())
         })?)
     }
 
@@ -85,7 +86,7 @@ fn duration(values: &Values, name: &str, default: &str, allow_zero: bool) -> Res
 }
 
 pub fn server_port(directory: &Path) -> Result<u16> {
-    let values = load_values_with_validation(directory, |name| name == "SERVER_PORT")?;
+    let values = load_values_with_validation(directory, |name, _| name == "SERVER_PORT")?;
     value(&values, "SERVER_PORT", "9171")
         .trim()
         .parse()
@@ -93,14 +94,14 @@ pub fn server_port(directory: &Path) -> Result<u16> {
 }
 
 pub fn load_values(directory: &Path) -> Result<Values> {
-    load_values_with_validation(directory, |name| {
+    load_values_with_validation(directory, |name, _| {
         name == "SERVER_PORT" || API_SETTINGS.contains(&name)
     })
 }
 
 fn load_values_with_validation(
     directory: &Path,
-    is_setting: impl Fn(&str) -> bool,
+    is_consumed_setting: impl Fn(&str, &Values) -> bool,
 ) -> Result<Values> {
     let mut values = Values::new();
     // python-decouple と同じく、最初に見つかった .env のみを読み込む。
@@ -115,6 +116,7 @@ fn load_values_with_validation(
             Err(error) => return Err(error).context("Could not read .env"),
         }
     }
+    let mut invalid_names = Vec::new();
     for (name, value) in std::env::vars_os() {
         let Ok(name) = name.into_string() else {
             continue;
@@ -123,11 +125,13 @@ fn load_values_with_validation(
             Ok(value) => {
                 values.insert(name, value);
             }
-            // 消費する設定の不正値は.envへ戻さず、機密値を表示せずに拒否する。
-            Err(_) if is_setting(&name) => {
-                bail!("Environment variable '{name}' must be valid UTF-8");
-            }
-            Err(_) => {}
+            Err(_) => invalid_names.push(name),
+        }
+    }
+    // 環境変数の優先順位を確定し、消費する不正値だけを機密値なしで拒否する。
+    for name in invalid_names {
+        if is_consumed_setting(&name, &values) {
+            bail!("Environment variable '{name}' must be valid UTF-8");
         }
     }
     Ok(values)

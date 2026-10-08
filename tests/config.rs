@@ -268,6 +268,18 @@ fn non_unicode_setting_value() -> OsString {
 }
 
 #[cfg(unix)]
+fn remove_dotenv_requests_bundle(directory: &Path) {
+    let file = directory.join(".env");
+    let contents = fs::read_to_string(&file).unwrap();
+    let remaining = contents
+        .lines()
+        .filter(|line| !line.starts_with("REQUESTS_CA_BUNDLE="))
+        .collect::<Vec<_>>()
+        .join("\n");
+    fs::write(file, remaining).unwrap();
+}
+
+#[cfg(unix)]
 fn configuration_probe(
     directory: &Path,
     consumer: &str,
@@ -316,9 +328,13 @@ fn isolated_configuration_probe() {
     // Act
     let result: anyhow::Result<()> = match consumer.as_str() {
         "port" => server_port(&directory).map(|port| assert_eq!(port, 19271)),
-        "api" => Config::load(&directory).map(|config| {
+        "api" | "api-ca" => Config::load(&directory).map(|config| {
             assert_eq!(config.api_token, "dotenv-token-sensitive");
             assert_eq!(config.api_secret, "dotenv-secret-sensitive");
+            if consumer == "api-ca" {
+                let expected_ca = std::env::var("CONFIG_PROBE_EXPECTED_CA").unwrap();
+                assert_eq!(config.ca_bundle.as_deref(), Some(Path::new(&expected_ca)));
+            }
         }),
         "values" => load_values(&directory).map(|values| {
             assert_eq!(
@@ -399,8 +415,8 @@ fn non_unicode_api_overrides_never_fall_back_to_dotenv_or_default() {
     }
 }
 
-/// CA bundle の非 UTF-8 override が .env や別の CA 設定へ戻らないこと。
-/// Arrange: REQUESTS と CURL の各 CA 設定に非 UTF-8 値が設定されること。
+/// 選択される CA bundle の非 UTF-8 override が別の設定へ戻らないこと。
+/// Arrange: REQUESTS と選択対象の CURL の各設定に非 UTF-8 値が設定されること。
 /// Act: 子プロセスの公開 Config::load から設定が読み込まれること。
 /// Assert: 指定変数名だけの通常エラーが秘密値を含めず返されること。
 #[cfg(unix)]
@@ -408,9 +424,20 @@ fn non_unicode_api_overrides_never_fall_back_to_dotenv_or_default() {
 fn non_unicode_ca_override_never_falls_back_to_another_bundle() {
     // Arrange
     let directory = configuration_directory(true);
-    for key in ["REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"] {
-        let environment = [(key, non_unicode_setting_value())];
-
+    let cases = [
+        (
+            "REQUESTS_CA_BUNDLE",
+            vec![("REQUESTS_CA_BUNDLE", non_unicode_setting_value())],
+        ),
+        (
+            "CURL_CA_BUNDLE",
+            vec![
+                ("REQUESTS_CA_BUNDLE", OsString::new()),
+                ("CURL_CA_BUNDLE", non_unicode_setting_value()),
+            ],
+        ),
+    ];
+    for (key, environment) in cases {
         // Act
         let output = configuration_probe(&directory.0, "api", Some(key), &environment);
 
@@ -419,8 +446,59 @@ fn non_unicode_ca_override_never_falls_back_to_another_bundle() {
     }
 }
 
+/// REQUESTS が選択済みなら未使用 CURL の非 UTF-8 値が無視されること。
+/// Arrange: .env または実環境の REQUESTS と非 UTF-8 の CURL が設定されること。
+/// Act: 子プロセスの公開 Config::load から設定が読み込まれること。
+/// Assert: 優先順位どおりの REQUESTS の CA path が正常に返されること。
+#[cfg(unix)]
+#[test]
+fn selected_requests_bundle_ignores_unused_non_unicode_curl_override() {
+    // Arrange
+    for from_environment in [false, true] {
+        let directory = configuration_directory(true);
+        let selected_path = if from_environment {
+            "/tmp/process-selected-ca.pem"
+        } else {
+            "/tmp/ca-sensitive-fallback.pem"
+        };
+        let mut environment = vec![
+            ("CURL_CA_BUNDLE", non_unicode_setting_value()),
+            ("CONFIG_PROBE_EXPECTED_CA", OsString::from(selected_path)),
+        ];
+        if from_environment {
+            remove_dotenv_requests_bundle(&directory.0);
+            environment.push(("REQUESTS_CA_BUNDLE", OsString::from(selected_path)));
+        }
+
+        // Act
+        let output = configuration_probe(&directory.0, "api-ca", None, &environment);
+
+        // Assert
+        assert_configuration_probe(output);
+    }
+}
+
+/// REQUESTS 未設定時に選択される CURL の非 UTF-8 値が拒否されること。
+/// Arrange: REQUESTS の定義がなく非 UTF-8 の CURL が設定されること。
+/// Act: 子プロセスの公開 Config::load から設定が読み込まれること。
+/// Assert: CURL の通常エラーが秘密値を含めず返されること。
+#[cfg(unix)]
+#[test]
+fn selected_non_unicode_curl_override_is_rejected_when_requests_is_unset() {
+    // Arrange
+    let directory = configuration_directory(true);
+    remove_dotenv_requests_bundle(&directory.0);
+    let environment = [("CURL_CA_BUNDLE", non_unicode_setting_value())];
+
+    // Act
+    let output = configuration_probe(&directory.0, "api", Some("CURL_CA_BUNDLE"), &environment);
+
+    // Assert
+    assert_configuration_probe(output);
+}
+
 /// 公開 load_values でも既知の非 UTF-8 override が拒否されること。
-/// Arrange: port・token・CA の既知設定に非 UTF-8 値が設定されること。
+/// Arrange: port・token・優先順位によらない全 CA 設定に非 UTF-8 値が設定されること。
 /// Act: 子プロセスの公開 load_values から設定が読み込まれること。
 /// Assert: 型変換前に該当変数名だけの通常エラーが返されること。
 #[cfg(unix)]
@@ -428,7 +506,12 @@ fn non_unicode_ca_override_never_falls_back_to_another_bundle() {
 fn public_values_loader_rejects_known_non_unicode_overrides() {
     // Arrange
     let directory = configuration_directory(true);
-    for key in ["SERVER_PORT", "SWITCHBOT_API_TOKEN", "REQUESTS_CA_BUNDLE"] {
+    for key in [
+        "SERVER_PORT",
+        "SWITCHBOT_API_TOKEN",
+        "REQUESTS_CA_BUNDLE",
+        "CURL_CA_BUNDLE",
+    ] {
         let environment = [(key, non_unicode_setting_value())];
 
         // Act
