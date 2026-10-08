@@ -34,6 +34,8 @@ Git tag、draft を含む Release、設定した image tag の未使用を確認
 
 後続 job は採番 commit の SHA を checkout する。GITHUB_SHA は元イベントの SHA のままなので、公開対象には使わない。タグ作成による別 workflow の起動を待たず、同じ run の後続 job で完結させる。
 
+Rust Docker の `Build and validate native image` は runner の architecture での検証であり、公開 image の完成確認ではない。続く `Build and push immutable image` で amd64 / arm64 の両方をビルドし、公開 image の確認後に GitHub Release を作成する。採番 commit・タグが存在して Release がまだない場合は、同じ run の現在の step とログを確認し、実行中・skip・失敗を区別する。実行中の build を、Release が未作成という理由だけで再実行しない。
+
 全検証・配布物が完成してから Release を公開する。GitHub Latest・Docker latest は最新の完成済み Release にだけ更新する。汎用 GitHub Release と Tauri の prerelease は Latest の照会・昇格対象外で、初回公開でも Latest を変更しない。Tauri の prerelease は Tap 通知の対象外。
 
 汎用 GitHub Release の分類には採番済み VERSION の build metadata より前を使う。通常 SemVer の 1.2.3-r1 は prerelease。upstream-revision の上流 VERSION が 1.2.3 なら公開 tag 1.2.3-r1 は通常 Release・Latest 候補で、上流 VERSION が 1.2.3-rc.1 なら prerelease。公開 tag の revision suffix だけで分類しない。
