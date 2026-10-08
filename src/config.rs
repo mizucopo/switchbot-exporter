@@ -9,6 +9,17 @@ use anyhow::{Context, Result, bail};
 
 pub type Values = HashMap<String, String>;
 
+const API_SETTINGS: [&str; 8] = [
+    "SWITCHBOT_API_TOKEN",
+    "SWITCHBOT_API_SECRET",
+    "CACHE_DIR",
+    "CACHE_EXPIRE_SECOND",
+    "DELAY_SECOND",
+    "API_TIMEOUT_SECOND",
+    "REQUESTS_CA_BUNDLE",
+    "CURL_CA_BUNDLE",
+];
+
 #[derive(Clone)]
 pub struct Config {
     pub api_token: String,
@@ -22,7 +33,9 @@ pub struct Config {
 
 impl Config {
     pub fn load(directory: &Path) -> Result<Self> {
-        Self::from_values(&load_values(directory)?)
+        Self::from_values(&load_values_with_validation(directory, |name| {
+            API_SETTINGS.contains(&name)
+        })?)
     }
 
     pub fn from_values(values: &Values) -> Result<Self> {
@@ -72,7 +85,7 @@ fn duration(values: &Values, name: &str, default: &str, allow_zero: bool) -> Res
 }
 
 pub fn server_port(directory: &Path) -> Result<u16> {
-    let values = load_values(directory)?;
+    let values = load_values_with_validation(directory, |name| name == "SERVER_PORT")?;
     value(&values, "SERVER_PORT", "9171")
         .trim()
         .parse()
@@ -80,6 +93,15 @@ pub fn server_port(directory: &Path) -> Result<u16> {
 }
 
 pub fn load_values(directory: &Path) -> Result<Values> {
+    load_values_with_validation(directory, |name| {
+        name == "SERVER_PORT" || API_SETTINGS.contains(&name)
+    })
+}
+
+fn load_values_with_validation(
+    directory: &Path,
+    is_setting: impl Fn(&str) -> bool,
+) -> Result<Values> {
     let mut values = Values::new();
     // python-decouple と同じく、最初に見つかった .env のみを読み込む。
     for ancestor in directory.ancestors() {
@@ -93,12 +115,21 @@ pub fn load_values(directory: &Path) -> Result<Values> {
             Err(error) => return Err(error).context("Could not read .env"),
         }
     }
-    // 設定と無関係な非UTF-8の環境変数でプロセス全体をpanicさせない。
-    values.extend(
-        std::env::vars_os().filter_map(|(name, value)| {
-            Some((name.into_string().ok()?, value.into_string().ok()?))
-        }),
-    );
+    for (name, value) in std::env::vars_os() {
+        let Ok(name) = name.into_string() else {
+            continue;
+        };
+        match value.into_string() {
+            Ok(value) => {
+                values.insert(name, value);
+            }
+            // 消費する設定の不正値は.envへ戻さず、機密値を表示せずに拒否する。
+            Err(_) if is_setting(&name) => {
+                bail!("Environment variable '{name}' must be valid UTF-8");
+            }
+            Err(_) => {}
+        }
+    }
     Ok(values)
 }
 

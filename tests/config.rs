@@ -7,6 +7,12 @@ use std::{
 
 use switchbot_exporter::config::{Config, Values, load_values, parse_env};
 
+#[cfg(unix)]
+use std::{ffi::OsString, os::unix::ffi::OsStringExt, path::Path, process::Command};
+
+#[cfg(unix)]
+use switchbot_exporter::config::server_port;
+
 static DIRECTORY_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 struct TestDirectory(PathBuf);
@@ -238,4 +244,239 @@ fn nearest_dotenv_is_used_and_environment_has_priority() {
     assert_eq!(values.get(&key).map(String::as_str), Some("child"));
     assert!(!values.contains_key(&parent_key));
     assert_eq!(values.get("PATH"), Some(&environment_path));
+}
+
+#[cfg(unix)]
+fn configuration_directory(include_port: bool) -> TestDirectory {
+    let directory = TestDirectory::new();
+    let port = if include_port {
+        "SERVER_PORT=19271\n"
+    } else {
+        ""
+    };
+    fs::write(directory.0.join(".env"), format!(
+        "{port}SWITCHBOT_API_TOKEN=dotenv-token-sensitive\nSWITCHBOT_API_SECRET=dotenv-secret-sensitive\nREQUESTS_CA_BUNDLE=/tmp/ca-sensitive-fallback.pem\n"
+    )).unwrap();
+    directory
+}
+
+#[cfg(unix)]
+fn non_unicode_setting_value() -> OsString {
+    let mut value = b"nonunicode-private-marker".to_vec();
+    value.push(0xff);
+    OsString::from_vec(value)
+}
+
+#[cfg(unix)]
+fn configuration_probe(
+    directory: &Path,
+    consumer: &str,
+    expected_error: Option<&str>,
+    environment: &[(&str, OsString)],
+) -> std::process::Output {
+    Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--ignored",
+            "--exact",
+            "isolated_configuration_probe",
+            "--nocapture",
+        ])
+        .current_dir(directory)
+        .env_clear()
+        .env("CONFIG_PROBE_CONSUMER", consumer)
+        .env("CONFIG_PROBE_ERROR_VARIABLE", expected_error.unwrap_or(""))
+        .envs(environment.iter().map(|(key, value)| (*key, value)))
+        .output()
+        .unwrap()
+}
+
+#[cfg(unix)]
+fn assert_configuration_probe(output: std::process::Output) {
+    assert!(
+        output.status.success(),
+        "child test failed:\n{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+/// 子プロセスで消費者ごとの非 UTF-8 設定の検証が行われること。
+/// Arrange: 公開設定 API・期待エラー・隔離された環境が用意されること。
+/// Act: 指定された消費者の設定が読み込まれること。
+/// Assert: 指定変数名だけの通常エラーまたは .env の正常設定が返されること。
+#[cfg(unix)]
+#[test]
+#[ignore = "隔離された子プロセスからのみ実行"]
+fn isolated_configuration_probe() {
+    // Arrange
+    let consumer = std::env::var("CONFIG_PROBE_CONSUMER").unwrap();
+    let expected_error = std::env::var("CONFIG_PROBE_ERROR_VARIABLE").unwrap();
+    let directory = std::env::current_dir().unwrap();
+
+    // Act
+    let result: anyhow::Result<()> = match consumer.as_str() {
+        "port" => server_port(&directory).map(|port| assert_eq!(port, 19271)),
+        "api" => Config::load(&directory).map(|config| {
+            assert_eq!(config.api_token, "dotenv-token-sensitive");
+            assert_eq!(config.api_secret, "dotenv-secret-sensitive");
+        }),
+        "values" => load_values(&directory).map(|values| {
+            assert_eq!(
+                values.get("SWITCHBOT_API_TOKEN").map(String::as_str),
+                Some("dotenv-token-sensitive")
+            );
+        }),
+        _ => panic!("公開設定の消費者が指定されること"),
+    };
+
+    // Assert
+    if expected_error.is_empty() {
+        result.expect("消費しない設定の非 UTF-8 値は検証されないこと");
+    } else {
+        let error = result.expect_err("既知設定が .env や既定値に fallback されないこと");
+        let message = format!("{error:#}");
+        assert!(message.contains(&expected_error), "{message}");
+        assert!(message.contains("UTF-8"), "{message}");
+        for private_value in [
+            "nonunicode-private-marker",
+            "dotenv-token-sensitive",
+            "dotenv-secret-sensitive",
+            "ca-sensitive-fallback",
+        ] {
+            assert!(
+                !message.contains(private_value),
+                "秘密値がエラーに含まれないこと"
+            );
+        }
+        assert!(!message.contains("panicked"));
+    }
+}
+
+/// SERVER_PORT の非 UTF-8 override が .env や既定値へ戻らないこと。
+/// Arrange: port の .env 有無それぞれに非 UTF-8 の実環境値が設定されること。
+/// Act: 子プロセスの公開 server_port から設定が読み込まれること。
+/// Assert: port 設定の通常エラーが秘密値を含めず返されること。
+#[cfg(unix)]
+#[test]
+fn non_unicode_port_override_never_falls_back_to_dotenv_or_default() {
+    // Arrange
+    for include_port in [true, false] {
+        let directory = configuration_directory(include_port);
+        let environment = [("SERVER_PORT", non_unicode_setting_value())];
+
+        // Act
+        let output = configuration_probe(&directory.0, "port", Some("SERVER_PORT"), &environment);
+
+        // Assert
+        assert_configuration_probe(output);
+    }
+}
+
+/// API が消費する非 UTF-8 設定の override が .env や既定値へ戻らないこと。
+/// Arrange: 認証・cache・delay・timeout の各非 UTF-8 値が設定されること。
+/// Act: 子プロセスの公開 Config::load から設定が読み込まれること。
+/// Assert: 指定変数名だけの通常エラーが返されること。
+#[cfg(unix)]
+#[test]
+fn non_unicode_api_overrides_never_fall_back_to_dotenv_or_default() {
+    // Arrange
+    let directory = configuration_directory(true);
+    for key in [
+        "SWITCHBOT_API_TOKEN",
+        "SWITCHBOT_API_SECRET",
+        "CACHE_DIR",
+        "CACHE_EXPIRE_SECOND",
+        "DELAY_SECOND",
+        "API_TIMEOUT_SECOND",
+    ] {
+        let environment = [(key, non_unicode_setting_value())];
+
+        // Act
+        let output = configuration_probe(&directory.0, "api", Some(key), &environment);
+
+        // Assert
+        assert_configuration_probe(output);
+    }
+}
+
+/// CA bundle の非 UTF-8 override が .env や別の CA 設定へ戻らないこと。
+/// Arrange: REQUESTS と CURL の各 CA 設定に非 UTF-8 値が設定されること。
+/// Act: 子プロセスの公開 Config::load から設定が読み込まれること。
+/// Assert: 指定変数名だけの通常エラーが秘密値を含めず返されること。
+#[cfg(unix)]
+#[test]
+fn non_unicode_ca_override_never_falls_back_to_another_bundle() {
+    // Arrange
+    let directory = configuration_directory(true);
+    for key in ["REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"] {
+        let environment = [(key, non_unicode_setting_value())];
+
+        // Act
+        let output = configuration_probe(&directory.0, "api", Some(key), &environment);
+
+        // Assert
+        assert_configuration_probe(output);
+    }
+}
+
+/// 公開 load_values でも既知の非 UTF-8 override が拒否されること。
+/// Arrange: port・token・CA の既知設定に非 UTF-8 値が設定されること。
+/// Act: 子プロセスの公開 load_values から設定が読み込まれること。
+/// Assert: 型変換前に該当変数名だけの通常エラーが返されること。
+#[cfg(unix)]
+#[test]
+fn public_values_loader_rejects_known_non_unicode_overrides() {
+    // Arrange
+    let directory = configuration_directory(true);
+    for key in ["SERVER_PORT", "SWITCHBOT_API_TOKEN", "REQUESTS_CA_BUNDLE"] {
+        let environment = [(key, non_unicode_setting_value())];
+
+        // Act
+        let output = configuration_probe(&directory.0, "values", Some(key), &environment);
+
+        // Assert
+        assert_configuration_probe(output);
+    }
+}
+
+/// port 読み込み時には API 設定の非 UTF-8 値が遅延検証されること。
+/// Arrange: 正常な port と非 UTF-8 の token・secret・CA が設定されること。
+/// Act: 子プロセスから公開 server_port が読み込まれること。
+/// Assert: API 設定の検証前に正しい port が返されること。
+#[cfg(unix)]
+#[test]
+fn server_port_defers_validation_of_api_configuration() {
+    // Arrange
+    let directory = configuration_directory(true);
+    let environment = [
+        "SWITCHBOT_API_TOKEN",
+        "SWITCHBOT_API_SECRET",
+        "REQUESTS_CA_BUNDLE",
+        "CURL_CA_BUNDLE",
+    ]
+    .map(|key| (key, non_unicode_setting_value()));
+
+    // Act
+    let output = configuration_probe(&directory.0, "port", None, &environment);
+
+    // Assert
+    assert_configuration_probe(output);
+}
+
+/// API 設定読み込み時には未使用 port の非 UTF-8 値が無視されること。
+/// Arrange: 正常な API 設定と非 UTF-8 の SERVER_PORT が設定されること。
+/// Act: 子プロセスから公開 Config::load が読み込まれること。
+/// Assert: server 起動を必要としない API 設定が正常に返されること。
+#[cfg(unix)]
+#[test]
+fn api_configuration_does_not_validate_an_unused_server_port() {
+    // Arrange
+    let directory = configuration_directory(true);
+    let environment = [("SERVER_PORT", non_unicode_setting_value())];
+
+    // Act
+    let output = configuration_probe(&directory.0, "api", None, &environment);
+
+    // Assert
+    assert_configuration_probe(output);
 }
