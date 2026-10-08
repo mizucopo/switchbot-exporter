@@ -1,5 +1,5 @@
 # ビルドステージ
-FROM rust:1.94-alpine3.23 AS builder
+FROM rust:1.99-alpine3.23 AS builder
 
 RUN apk add --no-cache build-base
 
@@ -15,7 +15,7 @@ RUN cargo fetch --locked
 RUN --network=none cargo test --locked --offline --all-targets --all-features
 
 # 実行ステージ
-FROM alpine:3.23
+FROM alpine:3.24
 
 RUN apk add --no-cache ca-certificates tzdata \
   && ln -snf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime \
