@@ -73,12 +73,21 @@ jobs:
           export RELEASE_PLAN_OUTPUT="$RUNNER_TEMP/release-plan.json"
           printf 'RELEASE_PLAN_OUTPUT=%s\n' "$RELEASE_PLAN_OUTPUT" >> "$GITHUB_ENV"
           python3 -I .github/scripts/release.py plan
-      - name: Set up Python
+      - name: Install Rust toolchain
+        run: rustup show
+      - name: Validate Rust release
+        run: |
+          cargo fmt --all --check
+          cargo clippy --locked --all-targets --all-features -- -D warnings
+          cargo test --locked --all-targets --all-features
+          cargo build --release --locked
+
+      - name: Set up Python regression tooling
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version-file: .python-version
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-      - name: Validate Python release
+      - name: Validate release-controller regressions
         run: |
           uv sync --locked
           uv run task check
@@ -243,7 +252,15 @@ jobs:
         run: |
           docker build --check .
           docker build -t release-check .
-          docker run --rm release-check .venv/bin/python --version
+          docker run --rm --network none release-check switchbot-exporter --version
+          docker run --rm --network none release-check switchbot-exporter --help
+          bash tests/docker_smoke.sh release-check
+
+      - name: Set up QEMU
+        if: steps.image-state.outputs.version_exists != 'true'
+        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+        with:
+          platforms: arm64
 
       - name: Set up Docker Buildx
         if: steps.image-state.outputs.version_exists != 'true'
@@ -267,6 +284,7 @@ jobs:
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: mizucopo/switchbot-exporter:${{ steps.image-state.outputs.image_tag }}
       - name: Verify published image
         env:

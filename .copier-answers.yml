@@ -6,8 +6,10 @@ docker_build_context: .
 docker_image_name: switchbot-exporter
 docker_login_username: mizucopo
 docker_registry: mizucopo
-docker_release_platforms: []
-docker_smoke_command: .venv/bin/python --version
+docker_release_platforms:
+  - linux/amd64
+  - linux/arm64
+docker_smoke_command: switchbot-exporter --version
 dockerfile_path: Dockerfile
 project_description: Prometheus SwitchBot Exporter
 project_name: switchbot-exporter
@@ -23,8 +25,9 @@ use_gh_actions_docker_project_pipeline: false
 use_gh_actions_docker_quality: true
 use_gh_actions_docker_release: true
 use_mit_license: true
-use_python: true
-use_rust: false
+use_python: false
+use_rust: true
+rust_version: '1.94.0'
 use_tauri: false
 use_version_management: true
 repo_template_tauri_branding_assets_created: false

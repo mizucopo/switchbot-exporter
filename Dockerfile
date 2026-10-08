@@ -1,25 +1,23 @@
 # ビルドステージ
-FROM python:3.14-alpine AS builder
+FROM rust:1.94-bookworm AS builder
 
-RUN apk add --no-cache \
-    tzdata \
-  && cp /usr/share/zoneinfo/Asia/Tokyo /etc/localtime \
-  && echo "Asia/Tokyo" > /etc/timezone
-
+WORKDIR /build
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+RUN cargo build --release --locked --bin switchbot-exporter
 
 # 実行ステージ
-FROM python:3.14-alpine
+FROM debian:bookworm-slim
 
-COPY --from=builder /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
-COPY --from=builder /etc/timezone /etc/timezone
+RUN apt-get update \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    ca-certificates tzdata \
+  && ln -snf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime \
+  && echo "Asia/Tokyo" > /etc/timezone \
+  && rm -rf /var/lib/apt/lists/*
 
+ENV TZ=Asia/Tokyo
 WORKDIR /app
-COPY pyproject.toml uv.lock ./
-COPY src ./
-
-RUN apk add --no-cache gcc python3-dev musl-dev linux-headers \
-  && pip install --no-cache-dir uv \
-  && uv sync --frozen --no-install-project \
-  && rm -rf /root/.cache/uv
-
-CMD [".venv/bin/gunicorn", "-w", "4", "-b", "0.0.0.0:9171", "--timeout", "180", "--chdir", "/app", "app:app"]
+COPY --from=builder /build/target/release/switchbot-exporter /usr/local/bin/switchbot-exporter
+EXPOSE 9171
+CMD ["switchbot-exporter", "exporter"]

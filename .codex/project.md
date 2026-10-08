@@ -19,25 +19,24 @@
 
 ## Code organization
 
-- Keep one class per file and one test file per class.
-- Keep `__init__.py` files empty.
-- Create a new file when adding a new class; name its test file `test_<filename>.py`.
+- The application runtime is Rust. Keep modules separated by responsibility and integration tests named after the affected module.
 - Place imports at the top of the file.
-- Fix lint errors in code; never relax configuration or modify `pyproject.toml` to fix lint errors.
+- Fix lint errors in code; never relax quality configuration to make a failing check pass.
 
 ## Tests
 
-- Use function-based pytest tests, not test classes.
+- Use function-based Rust integration tests and pytest tests for release-controller tooling.
 - Write test comments and docstrings in Japanese.
 - Test observable behavior and results, not implementation details or private methods directly.
 - Minimize mocks. Use real instances for domain logic and mock only external boundaries such as DB, API, and SMTP.
 - Separate domain logic from IO using Humble Object or Hexagonal patterns where needed for testability.
 - Mirror the source module structure under `tests/` and use English names for test functions that describe business requirements.
 - Use explicit Arrange, Act, Assert sections in each test:
-  - In the Japanese docstring, include `Arrange:`, `Act:`, and `Assert:` lines describing each step.
-  - In the function body, use `# Arrange`, `# Act`, and `# Assert` section dividers.
+  - In Japanese test documentation, include `Arrange:`, `Act:`, and `Assert:` lines describing each step.
+  - In the function body, use language-appropriate Arrange / Act / Assert comment dividers.
 - Describe each test in a Japanese docstring using passive `〜こと` phrasing consistently, including the title and each step.
 
-## Python application layout
+## Python tooling
 
-- The flat Python application imports modules directly from `src/`. Use the template-provided application layout, mypy discovery settings, and `tests/run_pytest.py` runner. The previous temporary exception for `src/__init__.py` and `tests/test_import.py` was resolved by `mizucopo/repo-template#105`.
+- Python is retained only for the shared release controller and its regression tests, not the runtime or Docker image. Use `uv run task check` for that tooling in addition to the Rust gate.
+- Preserve the pinned shared release controller. Rust migration changes its manifest declarations and build validation; unrelated template fixes require a separate Issue/PR.

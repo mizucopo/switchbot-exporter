@@ -1,6 +1,8 @@
 """リリースコントローラーのDocker Hub照会契約の回帰テスト。"""
 
 import importlib.util
+import json
+import tomllib
 from email.message import Message
 from io import BytesIO
 from pathlib import Path
@@ -18,6 +20,68 @@ IMAGE = {
     "repository": "mizucopo/switchbot-exporter",
     "tag": "2.0.2",
 }
+
+
+def test_cargo_release_sources_agree_with_manifest_version(
+    release_controller: ModuleType,
+) -> None:
+    """Rust移行後の採番対象から同じversionが読まれること。
+
+    Arrange: 実際のrelease宣言とCargo manifest/lockが用意されること。
+    Act: 宣言されたversion sourceとlockがcontrollerで読み込まれること。
+    Assert: manifestに宣言されたversionが両方から取得されること。
+    """
+    # Arrange
+    policy = json.loads(Path(".github/release.json").read_text())
+    specs = policy["version"]["sources"] + policy["version"]["locks"]
+
+    # Act
+    versions = [
+        release_controller.read_field(Path(spec["path"]).read_bytes(), spec)
+        for spec in specs
+    ]
+
+    # Assert
+    assert {spec["path"] for spec in specs} == {"Cargo.toml", "Cargo.lock"}
+    expected = tomllib.loads(Path("Cargo.toml").read_text())["package"]["version"]
+    assert versions == [expected, expected]
+
+
+def test_cargo_numbering_changes_only_root_package_version(
+    release_controller: ModuleType,
+) -> None:
+    """Cargo採番でroot package以外の設定と依存versionが維持されること。
+
+    Arrange: 実際のCargo採番宣言と元blobが用意されること。
+    Act: ファイルを変更せずメモリ内で異なるversionへ更新されること。
+    Assert: root versionだけが変更され、同versionではbyte一致となること。
+    """
+    # Arrange
+    policy = json.loads(Path(".github/release.json").read_text())
+    specs = policy["version"]["sources"] + policy["version"]["locks"]
+    for spec in specs:
+        original = Path(spec["path"]).read_bytes()
+        old = release_controller.read_field(original, spec)
+
+        # Act
+        target = old + "-test.1"
+        updated = release_controller.write_field(original, spec, target)
+        before = tomllib.loads(original.decode())
+        after = tomllib.loads(updated.decode())
+
+        # Assert
+        assert release_controller.read_field(updated, spec) == target
+        assert release_controller.write_field(original, spec, old) == original
+        if spec["format"] == "toml-lock":
+            package = next(
+                item
+                for item in after["package"]
+                if item["name"] == "switchbot-exporter"
+            )
+            package["version"] = old
+        else:
+            after["package"]["version"] = old
+        assert after == before
 
 
 @pytest.fixture
