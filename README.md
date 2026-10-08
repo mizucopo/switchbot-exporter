@@ -68,10 +68,13 @@ uv sync --locked
 uv run task check
 ```
 
-Docker は `linux/amd64` と `linux/arm64` に対応します。PR CI は両方の native runner で image を build し、外部ネットワークを無効にした smoke を実行します。
+Docker は Alpine Linux / musl を使い、`linux/amd64` と `linux/arm64` に対応します。CA証明書と `Asia/Tokyo` のtimezone dataを含み、起動コマンド・設定・実行UIDは従来どおりです。[Alpine 化の判断](docs/adr/0002-alpine-runtime.md)と検証範囲を記録しています。軽量化幅や性能は計測していません。
+
+PR CI は両方の native runner で、外部ネットワークを無効にしたmusl版の統合テストとruntime imageのsmokeを実行します。統合テストはローカルHTTPS・独自CA・proxyも確認します。ビルド用ツールとテスト用fixtureは配布imageには含みません。
 
 ```sh
 docker build --check .
+docker build --target test .
 docker build -t switchbot-exporter:develop .
 docker run --rm --network none switchbot-exporter:develop switchbot-exporter --version
 bash tests/docker_smoke.sh switchbot-exporter:develop

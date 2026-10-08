@@ -32,6 +32,14 @@ jobs:
         env:
           BUILD_PLATFORM: ${{ matrix.platform }}
         run: docker buildx build --check --platform "$BUILD_PLATFORM" --file "$DOCKERFILE_PATH" "$DOCKER_BUILD_CONTEXT"
+      - name: Run musl integration tests without external network
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: "."
+          file: "Dockerfile"
+          target: test
+          push: false
+          platforms: ${{ matrix.platform }}
       - name: Build Docker image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:

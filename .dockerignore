@@ -5,3 +5,7 @@
 !Cargo.lock
 !src/
 !src/**
+!tests/
+!tests/*.rs
+!tests/fixtures/
+!tests/fixtures/**
