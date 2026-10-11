@@ -1,4 +1,4 @@
-_commit: 6034b46
+_commit: b205fcd8f523737f1092f697967c5ef54144d064
 _src_path: git@github.com:mizucopo/repo-template.git
 author_email: mizu.copo@gmail.com
 author_name: みず
@@ -7,15 +7,14 @@ docker_image_name: switchbot-exporter
 docker_login_username: mizucopo
 docker_registry: mizucopo
 docker_release_platforms:
-  - linux/amd64
-  - linux/arm64
+- linux/amd64
+- linux/arm64
 docker_smoke_command: switchbot-exporter --version
 dockerfile_path: Dockerfile
 project_description: Prometheus SwitchBot Exporter
 project_name: switchbot-exporter
 project_version: 2.0.18
-python_project_kind: application
-python_version: '3.14'
+rust_version: 1.94.0
 use_aws_ecr: false
 use_chrome_extension: false
 use_dependabot_docker: true
@@ -27,7 +26,6 @@ use_gh_actions_docker_release: true
 use_mit_license: true
 use_python: false
 use_rust: true
-rust_version: '1.94.0'
 use_tauri: false
 use_version_management: true
 repo_template_tauri_branding_assets_created: false

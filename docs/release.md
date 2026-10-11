@@ -36,9 +36,19 @@ Git tag、draft を含む Release、設定した image tag の未使用を確認
 
 Rust Docker の `Build and validate native image` は runner の architecture での検証であり、公開 image の完成確認ではない。続く `Build and push immutable image` で amd64 / arm64 の両方をビルドし、公開 image の確認後に GitHub Release を作成する。採番 commit・タグが存在して Release がまだない場合は、同じ run の現在の step とログを確認し、実行中・skip・失敗を区別する。実行中の build を、Release が未作成という理由だけで再実行しない。
 
-全検証・配布物が完成してから Release を公開する。GitHub Latest・Docker latest は最新の完成済み Release にだけ更新する。汎用 GitHub Release と Tauri の prerelease は Latest の照会・昇格対象外で、初回公開でも Latest を変更しない。Tauri の prerelease は Tap 通知の対象外。
+全検証・配布物が完成してから Release を公開する。GitHub Latest・Docker latest は最新の完成済み安定版 Release にだけ更新する。汎用 GitHub Release、Docker、Docker project、Tauri の prerelease は Latest の照会・昇格対象外で、初回公開でも Latest を変更しない。過去に通常 Release として公開された prerelease も採番記録から除外する。Tauri の prerelease は Tap 通知の対象外。
 
-汎用 GitHub Release の分類には採番済み VERSION の build metadata より前を使う。通常 SemVer の 1.2.3-r1 は prerelease。upstream-revision の上流 VERSION が 1.2.3 なら公開 tag 1.2.3-r1 は通常 Release・Latest 候補で、上流 VERSION が 1.2.3-rc.1 なら prerelease。公開 tag の revision suffix だけで分類しない。
+Release 作成応答の ID を後続の asset 添付・配布案内・draft 公開へ引き継ぐため、作成直後の一覧反映を待たずに完了できる。再実行時は全ページの一覧から既存 Release と重複を確認し、完成済み asset を保持する。
+
+Release の分類は共通公開計画で採番済み VERSION と方式から決める。build metadata は分類に影響しない。通常 SemVer の 1.2.3-r1 は prerelease。upstream-revision の上流 VERSION が 1.2.3 なら公開 tag 1.2.3-r1 は通常 Release・Latest 候補で、上流 VERSION が 1.2.3-rc.1 なら prerelease。公開 tag の revision suffix だけで分類しない。
+
+Docker image tag は展開後の `+` を `_` に変換する（例 `1.2.3+build.1` → `1.2.3_build.1`）。SemVer に `_` は使えないため prerelease の `-` と衝突せず、Git version・tag・Release 名は元の値を保持する。有効な既存 image tag は変わらない。変換後にも tag の長さ・形式・使用済み状態・所有者を検証する。
+
+## 配布案内
+
+汎用 Release・Docker Release・Docker project pipeline は、添付済み asset と公開設定の image を本文の管理ブロックに案内する。既存のリリースノート・手書き本文は保持し、再実行では同じブロックを更新する。Docker Hub はリンクと実際の version tag の PULL コマンドを載せ、ECR は ECR の PULL コマンドを載せる。公開先の照会失敗・未提供 image は公開前に停止する。
+
+`use_rust=true` の汎用 Release・Docker Release は、root Cargo package のdefault features の実行バイナリを Linux x64（GNU）向けにビルドし、`<package>-<tag>-linux-x86_64.tar.gz` を添付してから draft を公開する。library のみなら実行バイナリは添付しない。他の OS・architecture は配布しない。Python project 等に Rust バイナリの案内は生成しない。
 
 ## 失敗と復旧
 

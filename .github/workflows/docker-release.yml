@@ -54,6 +54,8 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.publish == 'true'
     runs-on: ubuntu-latest
+    outputs:
+      is_prerelease: ${{ steps.metadata.outputs.is_prerelease }}
     env:
       RELEASE_SHA: ${{ needs.prepare.outputs.release_sha }}
       DOCKERHUB_USERNAME: "mizucopo"
@@ -97,11 +99,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 -I .github/scripts/release.py image-state
+      - name: Classify release version
+        id: metadata
+        run: |
+          is_prerelease="$(jq -er '.publication.is_prerelease | select(type == "boolean") | tostring' "$RELEASE_PLAN_OUTPUT")"
+          echo "is_prerelease=$is_prerelease" >> "$GITHUB_OUTPUT"
       - name: Inspect GitHub Release
         id: release-state
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.prepare.outputs.release_tag }}
+          INSPECT_DRAFT_RELEASES: "true"
         run: |
           set -euo pipefail
 
@@ -169,6 +177,19 @@ jobs:
                 > "$RELEASE_RESPONSE"; then
               echo "::error::Could not inspect draft GitHub Releases for $TAG."
               exit 1
+            fi
+            if [ -n "${RELEASE_ID:-}" ]; then
+              if ! [[ "$RELEASE_ID" =~ ^[1-9][0-9]*$ ]] \
+                || ! jq -e --argjson id "$RELEASE_ID" \
+                  '. == null or .id == $id' "$RELEASE_RESPONSE" > /dev/null; then
+                echo "::error::Listed GitHub Release differs from retained ID."
+                exit 1
+              fi
+              gh api "/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > "$RELEASE_RESPONSE"
+              if ! jq -e --argjson id "$RELEASE_ID" '.id == $id' "$RELEASE_RESPONSE" > /dev/null; then
+                echo "::error::GitHub Release ID differs from retained ID."
+                exit 1
+              fi
             fi
             if [ "$(jq -r '. != null' "$RELEASE_RESPONSE")" = "true" ]; then
               release_exists=true
@@ -238,7 +259,7 @@ jobs:
             fi
           } >> "$GITHUB_OUTPUT"
       - name: Reject incomplete public release
-        if: steps.release-state.outputs.release_exists == 'true' && steps.image-state.outputs.version_exists != 'true'
+        if: steps.release-state.outputs.release_exists == 'true' && steps.release-state.outputs.release_is_draft != 'true' && steps.image-state.outputs.version_exists != 'true'
         run: |
           echo '::error::Published versioned image is missing; refusing to overwrite the release.'
           exit 1
@@ -294,14 +315,26 @@ jobs:
           GITHUB_OUTPUT="$RUNNER_TEMP/image-state" python3 -I .github/scripts/release.py image-state
           grep -qx version_exists=true "$RUNNER_TEMP/image-state"
       - name: Create GitHub Release
+        id: create-release
         if: steps.release-state.outputs.release_exists != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.prepare.outputs.release_tag }}
-        run: gh release create "$TAG" --verify-tag --latest=false --title "$TAG" --generate-notes
+          IS_PRERELEASE: ${{ steps.metadata.outputs.is_prerelease }}
+          RELEASE_DRAFT: "true"
+        run: python3 -I .github/scripts/release.py create
+
+      - name: Add release downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ steps.create-release.outputs.release_id || steps.release-state.outputs.release_id }}
+
+          BUILD_RUST_BINARY: "true"
+        run: python3 -I .github/scripts/release.py distribution
 
   promote-latest:
     needs: [prepare, release]
+    if: needs.prepare.outputs.publish == 'true' && needs.release.outputs.is_prerelease == 'false'
     runs-on: ubuntu-latest
     env:
       RELEASE_SHA: ${{ needs.prepare.outputs.release_sha }}
