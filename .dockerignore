@@ -3,9 +3,17 @@
 !Dockerfile
 !Cargo.toml
 !Cargo.lock
+!rust-toolchain.toml
 !src/
 !src/**
 !tests/
+tests/**
 !tests/*.rs
 !tests/fixtures/
 !tests/fixtures/**
+**/.git
+**/.env
+**/.env.*
+**/__pycache__
+**/*.py[cod]
+**/.venv
