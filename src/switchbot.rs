@@ -2,7 +2,7 @@ use std::{collections::HashMap, fs, time::SystemTime};
 
 use anyhow::{Context, Result, bail};
 use base64::{Engine, engine::general_purpose::STANDARD};
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use reqwest::{Certificate, Client, Url, header::HeaderValue};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
