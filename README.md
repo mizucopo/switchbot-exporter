@@ -5,7 +5,7 @@ SwitchBot API のステータスを Prometheus に公開する Rust 製 exporter
 
 ## 利用方法
 
-配布形態は引き続き Docker image です。Rust 版への移行前に [移行ガイド](docs/rust-migration.md) を確認してください。
+Docker image に加え、GitHub Release で Linux x64・Windows x64/ARM64・macOS ARM64 の実行バイナリを配布します。[バイナリの導入・設定・停止](docs/native-distribution.md)を参照してください。Rust 版への移行前に [移行ガイド](docs/rust-migration.md) を確認してください。
 
 ```sh
 docker pull mizucopo/switchbot-exporter:latest
@@ -49,7 +49,7 @@ cargo build --release --locked
 ```
 
 `devices` と `device-status` は JSON、`metrics` は Prometheus text を標準出力へ返します。
-`exporter` は SIGINT / SIGTERM で新規接続の受付を止め、処理中のリクエストを終了して停止します。
+`exporter` は Linux/macOS の SIGINT / SIGTERM、Windows の Ctrl+C / Ctrl+Break で新規接続の受付を止め、処理中のリクエストを終了して停止します。
 
 ## 開発と検証
 
@@ -61,6 +61,7 @@ cargo build --release --locked
 ```
 
 Rust テストはローカル HTTP mock と仮想時計で API 認証・取得・TTL・待機・エラー・HTTP route を確認します。実機 SwitchBot の操作や性能計測は行いません。
+native PR CI と Release の各対象runnerでは共通controllerのarchive・SHA-256・展開済み実行ファイルに加え、ローカルTLS/proxy mockによる設定読込・既存メトリクス・cache・エラー・timeout・処理中のscrapeを含む正常終了を確認します。Windows ARM64とmacOS ARM64もnative実行し、クロスビルドだけの確認とは区別します。
 採番 controller の既存回帰テストには Python 3.14 と uv を使用します。これは開発・CI 用で、配布 image に Python は含みません。
 
 ```sh

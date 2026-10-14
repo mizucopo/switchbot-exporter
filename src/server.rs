@@ -65,7 +65,16 @@ pub async fn shutdown_signal() {
             _ = terminate.recv() => {},
         }
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        let mut interrupt =
+            tokio::signal::windows::ctrl_break().expect("Could not register Ctrl-Break handler");
+        tokio::select! {
+            result = tokio::signal::ctrl_c() => result.expect("Could not register Ctrl-C handler"),
+            _ = interrupt.recv() => {},
+        }
+    }
+    #[cfg(not(any(unix, windows)))]
     tokio::signal::ctrl_c()
         .await
         .expect("Could not register Ctrl-C handler");

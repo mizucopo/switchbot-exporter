@@ -178,7 +178,15 @@ fn tls_acceptor() -> TlsAcceptor {
 }
 
 fn probe(directory: &Path, base_url: &str, expected: &str, environment: &[(&str, String)]) {
-    let output = Command::new(std::env::current_exe().unwrap())
+    let mut command = Command::new(std::env::current_exe().unwrap());
+    command.env_clear();
+    // Windows の Winsock 初期化に必要な OS パスだけを保持する。
+    #[cfg(windows)]
+    command.env(
+        "SystemRoot",
+        std::env::var_os("SystemRoot").expect("Windows の SystemRoot が設定されること"),
+    );
+    let output = command
         .args([
             "--ignored",
             "--exact",
@@ -186,7 +194,6 @@ fn probe(directory: &Path, base_url: &str, expected: &str, environment: &[(&str,
             "--nocapture",
         ])
         .current_dir(directory)
-        .env_clear()
         .env("SWITCHBOT_API_TOKEN", "network-test-token")
         .env("SWITCHBOT_API_SECRET", "network-test-secret")
         .env("CACHE_EXPIRE_SECOND", "0")

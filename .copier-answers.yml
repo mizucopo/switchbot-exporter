@@ -1,4 +1,4 @@
-_commit: b205fcd8f523737f1092f697967c5ef54144d064
+_commit: 6d6db9a3ac9de4fb404e6b89b4e5885ae2c14ad9
 _src_path: git@github.com:mizucopo/repo-template.git
 author_email: mizu.copo@gmail.com
 author_name: みず
@@ -14,12 +14,18 @@ dockerfile_path: Dockerfile
 project_description: Prometheus SwitchBot Exporter
 project_name: switchbot-exporter
 project_version: 2.0.18
+rust_release_targets:
+- x86_64-unknown-linux-gnu
+- x86_64-pc-windows-msvc
+- aarch64-pc-windows-msvc
+- aarch64-apple-darwin
 rust_version: 1.94.0
 use_aws_ecr: false
 use_chrome_extension: false
 use_dependabot_docker: true
 use_dependabot_github_actions: true
 use_docker: true
+use_gh_actions_codeql: false
 use_gh_actions_docker_project_pipeline: false
 use_gh_actions_docker_quality: true
 use_gh_actions_docker_release: true
