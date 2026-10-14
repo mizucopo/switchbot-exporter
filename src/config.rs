@@ -121,6 +121,9 @@ fn load_values_with_validation(
         let Ok(name) = name.into_string() else {
             continue;
         };
+        // Windows のプロセス環境変数名は大文字・小文字を区別しない。
+        #[cfg(windows)]
+        let name = name.to_ascii_uppercase();
         match value.into_string() {
             Ok(value) => {
                 values.insert(name, value);
