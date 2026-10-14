@@ -36,8 +36,7 @@
   - In the function body, use language-appropriate Arrange / Act / Assert comment dividers.
 - Describe each test in a Japanese docstring using passive `〜こと` phrasing consistently, including the title and each step.
 
-## Python tooling
+## CI helpers
 
-- Python supports the shared release controller, native-distribution smoke checks, and release-controller regression tests. uv manages development dependencies for the regression tests, lint, and type checks. Neither Python nor uv is required by the distributed executable or Docker runtime image.
-- Follow [the Python tooling inventory](../docs/python-tooling.md) for callers, retained files, and migration conditions. Run `uv sync --locked` and `uv run task check` in addition to the Rust gate; native-distribution smoke checks run separately on each target runner.
-- Preserve the pinned shared release controller. Rust migration changes its manifest declarations and build validation; unrelated template fixes require a separate Issue/PR.
+- GitHub Actions uses Python for the shared release controller, native-distribution smoke checks, and controller regression tests. When changing these CI helpers, run `uv sync --locked` and `uv run task check`; ordinary Rust development uses the Rust gate.
+- Preserve the shared controller and existing CI coverage. Python and uv are not exporter runtime dependencies.
