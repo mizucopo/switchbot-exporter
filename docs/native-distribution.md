@@ -13,7 +13,7 @@ Windows archiveには `switchbot-exporter.exe`、Linux/macOS archiveには `swit
 
 ## 前提と検証
 
-実行にRust・Python・uvは不要です。Windows 10/11は対応architectureの[Microsoft Visual C++ v14 Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)が必要です。LinuxはGNU/glibc環境向けです。Ubuntuのnative runnerでビルドするため、そのrunnerと互換のglibcを用意してください。Alpine/muslではDocker imageを使用します。macOSはApple Silicon向けです。署名・notarizationは提供していません。
+実行にRust・Python環境は不要です。Windows 10/11は対応architectureの[Microsoft Visual C++ v14 Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)が必要です。LinuxはGNU/glibc環境向けです。Ubuntuのnative runnerでビルドするため、そのrunnerと互換のglibcを用意してください。Alpine/muslではDocker imageを使用します。macOSはApple Silicon向けです。署名・notarizationは提供していません。
 
 WindowsはPowerShellでSHA-256を照合し、ZIPを展開します。
 

@@ -1,32 +1,10 @@
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Virtual Environment
-.venv/
-venv/
-ENV/
-env/
+# Actions Python helpers
+/.github/**/__pycache__/
+/.github/**/*.py[cod]
 
 # Environment/Secrets Variables
 .env
 .secrets
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Distribution
-build/
-dist/
 
 # Rust
 target/
@@ -38,9 +16,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-
-# Coverage
-coverage/
 
 # Ansible runtime state
 .ansible/tmp/

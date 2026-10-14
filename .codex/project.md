@@ -30,7 +30,7 @@
 - Test observable behavior and results, not implementation details or private methods directly.
 - Minimize mocks. Use real instances for domain logic and mock only external boundaries such as DB, API, and SMTP.
 - Separate domain logic from IO using Humble Object or Hexagonal patterns where needed for testability.
-- Mirror the source module structure under `tests/` and use English names for test functions that describe business requirements.
+- Mirror Rust source modules under `tests/` and place Actions regression tests under `.github/tests/`. Use English test function names that describe business requirements.
 - Use explicit Arrange, Act, Assert sections in each test:
   - In Japanese test documentation, include `Arrange:`, `Act:`, and `Assert:` lines describing each step.
   - In the function body, use language-appropriate Arrange / Act / Assert comment dividers.
@@ -38,5 +38,5 @@
 
 ## CI helpers
 
-- GitHub Actions uses Python for the shared release controller, native-distribution smoke checks, and controller regression tests. When changing these CI helpers, run `uv sync --locked` and `uv run task check`; ordinary Rust development uses the Rust gate.
-- Preserve the shared controller and existing CI coverage. Python and uv are not exporter runtime dependencies.
+- GitHub Actions keeps its Python helpers, dependencies, and quality gate under `.github/`. Ordinary Rust development uses the Rust gate.
+- Preserve the shared controller and existing CI coverage. Python is not an exporter runtime dependency.

@@ -1,0 +1,21 @@
+name: Check CI Python helpers
+description: Install pinned CI tools and preserve helper lint, typing, and regression checks.
+runs:
+  using: composite
+  steps:
+    - name: Set up CI Python
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: "3.14"
+    - name: Install CI-only dependencies
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: python -m pip install --disable-pip-version-check --require-hashes -r .github/requirements.txt
+    - name: Check CI helpers
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        python -m ruff check --isolated --no-cache --select E,W,F,I,B,SIM,C4,ARG --target-version py314 --line-length 88 .github/tests .github/scripts/release_smoke.py
+        python -m ruff format --check --isolated --no-cache --target-version py314 --line-length 88 .github/tests .github/scripts/release_smoke.py
+        python -m mypy --strict --python-version 3.14 --explicit-package-bases --cache-dir "$RUNNER_TEMP/mypy-cache" .github/tests .github/scripts/release_smoke.py
+        python -m pytest -o pythonpath=. -o cache_dir="$RUNNER_TEMP/pytest-cache" .github/tests

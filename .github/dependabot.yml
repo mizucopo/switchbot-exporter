@@ -9,8 +9,8 @@ updates:
         update-types:
           - "minor"
           - "patch"
-  - package-ecosystem: "uv"
-    directory: "/"
+  - package-ecosystem: "pip"
+    directory: "/.github"
     schedule:
       interval: "weekly"
     groups:

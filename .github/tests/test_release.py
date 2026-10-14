@@ -12,7 +12,7 @@ from urllib import error
 import pytest
 from pytest_mock import MockerFixture
 
-RELEASE_PATH = Path(__file__).resolve().parents[1] / ".github/scripts/release.py"
+RELEASE_PATH = Path(__file__).resolve().parents[2] / ".github/scripts/release.py"
 REPOSITORY_URL = "https://hub.docker.com/v2/repositories/mizucopo/switchbot-exporter/"
 TAG_URL = REPOSITORY_URL + "tags/2.0.2/"
 IMAGE = {

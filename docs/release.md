@@ -54,7 +54,7 @@ Docker image tag は展開後の `+` を `_` に変換する（例 `1.2.3+build.
 
 Docker Release（Rust の有無にかかわらず）と Docker project pipeline は新規 Release を draft として作り、最終 image 照会と配布案内の本文更新が成功した時点で公開する。照会・本文更新が失敗した場合は draft のまま元 run を再実行する。
 
-`use_rust=true` の汎用 Release・Docker Release は `rust_release_targets` で通常の Rust CLI / Exporter の配布対象を選ぶ。既定は既存の Linux x64（GNU）。root Cargo package の default features で有効な全 executable を同梱し、library のみ・無効な optional CLI のみの場合は配布 archive を作らない。Tauri の bundle 経路とは独立しており、Python のみの project や Docker project pipeline にこの配布 job は生成しない。
+`use_rust=true` の汎用 Release・Docker Release は `rust_release_targets` で通常の Rust CLI / Exporter の配布対象を選ぶ。既定は既存の Linux x64（GNU）。root Cargo package の default features で有効な全 executable を同梱し、library のみ・無効な optional CLI のみの場合は配布 archive を作らない。Tauri の bundle 経路とは独立している。
 
 | Rust target                | Native runner                  | Archive                               |
 | -------------------------- | ------------------------------ | ------------------------------------- |
@@ -72,14 +72,6 @@ Docker Release（Rust の有無にかかわらず）と Docker project pipeline 
 ### 製品固有処理との境界
 
 共通処理は target 選択・Cargo artifact 収集・命名・archive・checksum・最小 smoke・公開保護を所有する。OS の追加依存を導入する step は製品の生成済み `rust-builds` job に追記し、Copier update の three-way merge で保持・確認する。追加同梱物は製品が所有する script を `.github/release.json` の `publication.rust.stage_command`（既定 `[]`、shell を介さない argv）から呼ぶ。hook の作業 directory は project root、`RUST_RELEASE_STAGE_DIR` は executable を配置済みの一時 directory、`RUST_RELEASE_TARGET` / `RUST_RELEASE_TAG` は対象と tag。同梱する license・DLL・設定等を staging directory へコピーする。全 regular file を相対 path で同梱する。symlink は許可しない。hook の失敗、executable の削除・起動失敗は公開を止める。
-
-```json
-"rust": {
-  "targets": ["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc", "aarch64-apple-darwin"],
-  "smoke_args": ["--help"],
-  "stage_command": ["python", "scripts/package-release.py"]
-}
-```
 
 製品固有の CLI 引数は `smoke_args` を変更する。GUI や外部サービスへの接続確認、独自 archive、既存 checksum の形式、依存・license 検証、既存の公開保護を持つ製品は、製品 Issue で接続方法と追加 smoke を検討する。共通 template に製品名や製品依存を持ち込まない。この共通化だけで下流製品の release は変更されない。
 

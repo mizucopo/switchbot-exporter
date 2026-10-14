@@ -62,7 +62,7 @@ cargo build --release --locked
 
 Rust テストはローカル HTTP mock と仮想時計で API 認証・取得・TTL・待機・エラー・HTTP route を確認します。実機 SwitchBot の操作や性能計測は行いません。
 native PR CI と Release の各対象runnerでは共通controllerのarchive・SHA-256・展開済み実行ファイルに加え、ローカルTLS/proxy mockによる設定読込・既存メトリクス・cache・エラー・timeout・処理中のscrapeを含む正常終了を確認します。Windows ARM64とmacOS ARM64もnative実行し、クロスビルドだけの確認とは区別します。
-GitHub Actions は採番・配布検証・回帰テストに Python/uv を使用します。通常の Rust 開発と配布物の利用に Python/uv は不要です。
+GitHub Actions の採番・配布検証・回帰テスト用 Python は `.github/` 内に配置します。通常の Rust 開発と配布物の利用に Python は不要です。
 
 Docker は Alpine Linux / musl を使い、`linux/amd64` と `linux/arm64` に対応します。CA証明書と `Asia/Tokyo` のtimezone dataを含み、起動コマンド・設定・実行UIDは従来どおりです。[Alpine 化の判断](docs/adr/0002-alpine-runtime.md)と検証範囲を記録しています。軽量化幅や性能は計測していません。
 
