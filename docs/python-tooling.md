@@ -17,7 +17,9 @@ Issue #84 の整理では、次の現役ファイルを保持します。旧ア�
 | `.gitignore` の Python cache・仮想環境・pytest 記述 | 補助処理のローカル生成物を除外 | 開発時には生成される。共通テンプレートの他言語向け除外も、runtime 依存の宣言ではない |
 | `.codex/project.md`、`.codex/languages/python.md`、`AGENTS.md` | 人と agent の作業手順 | 補助処理の用途と必要な品質ゲートを示す |
 
-`pr-quality-checks.yml` の `distribution-targets` は runner の Python で共通 controller と `.github/release.json` を読み、対象 matrix を生成します。各 native job は Python 3.14 を用意し、Rust の品質検証と配布 smoke を実行します。PR の `quality-checks` と Release の `release` は `.python-version` と uv を使って以下の gate を実行します。
+`pr-quality-checks.yml` の `distribution-targets` は runner の Python で共通 controller と `.github/release.json` を読み、対象 matrix を生成します。PR の `native-distribution` は各対象で Python 3.14 を用意し、配布 smoke を実行します。Windows・macOS の native job は Rust の fmt/clippy/test も実行します。Linux x64 の Rust 品質ゲート（fmt/clippy/test/release build）は、別の `quality-checks` job で実行します。
+
+Release の `rust-builds` は各対象で共通 controller による build/archive と配布 smoke を実行し、Rust 品質ゲートは別の Linux `release` job が担当します。PR の `quality-checks` と Release の `release` は `.python-version` と uv を使って以下の Python gate も実行します。
 
 ```sh
 uv sync --locked
