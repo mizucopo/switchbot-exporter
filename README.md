@@ -62,7 +62,7 @@ cargo build --release --locked
 
 Rust テストはローカル HTTP mock と仮想時計で API 認証・取得・TTL・待機・エラー・HTTP route を確認します。実機 SwitchBot の操作や性能計測は行いません。
 native PR CI と Release の各対象runnerでは共通controllerのarchive・SHA-256・展開済み実行ファイルに加え、ローカルTLS/proxy mockによる設定読込・既存メトリクス・cache・エラー・timeout・処理中のscrapeを含む正常終了を確認します。Windows ARM64とmacOS ARM64もnative実行し、クロスビルドだけの確認とは区別します。
-採番 controller の既存回帰テストには Python 3.14 と uv を使用します。これは開発・CI 用で、配布 image に Python は含みません。
+Python は共通リリース controller、配布バイナリの smoke 検証、controller の回帰テストに使用します。開発・配布検証では Python 3.14 を用い、uv は回帰テスト・lint・型検査の開発環境を管理します。配布バイナリの利用に Python・uv は不要で、Docker runtime image にも含みません。[Python 補助処理の用途・保持範囲](docs/python-tooling.md)に、ファイル一覧、CI の呼び出し元と移行条件を記録しています。
 
 ```sh
 uv sync --locked

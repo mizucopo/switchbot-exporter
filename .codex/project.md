@@ -38,5 +38,6 @@
 
 ## Python tooling
 
-- Python is retained only for the shared release controller and its regression tests, not the runtime or Docker image. Use `uv run task check` for that tooling in addition to the Rust gate.
+- Python supports the shared release controller, native-distribution smoke checks, and release-controller regression tests. uv manages development dependencies for the regression tests, lint, and type checks. Neither Python nor uv is required by the distributed executable or Docker runtime image.
+- Follow [the Python tooling inventory](../docs/python-tooling.md) for callers, retained files, and migration conditions. Run `uv sync --locked` and `uv run task check` in addition to the Rust gate; native-distribution smoke checks run separately on each target runner.
 - Preserve the pinned shared release controller. Rust migration changes its manifest declarations and build validation; unrelated template fixes require a separate Issue/PR.

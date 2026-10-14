@@ -1,4 +1,5 @@
 [dependency-groups]
+# Development/CI dependencies; the exporter and its distributed binaries use Rust.
 dev = [
     "mypy>=2.3.0",
     "pytest>=9.1.1",
@@ -35,7 +36,7 @@ convention = "google"
 strict = true
 python_version = "3.14"
 
-# Python is used only for release-controller regression tooling.
+# Type-check regression tests and native-distribution smoke helpers.
 files = ["tests"]
 explicit_package_bases = true
 
