@@ -42,7 +42,7 @@ family は表の順序、sample はデバイス一覧の順序で出力する。
 
 失敗端末は0や期限切れの過去値で補完しない。TTL 内の正常 cache は引き続き利用する。HTTP・API・JSON エラーは保存せず、メトリクス取得で発見した status の形式・値の異常と一覧の形式異常も cache から除外し、次の scrape で再取得する。正常端末の cache は保持する。
 
-欠測が生じた scrape は標準エラーへ欠測端末数だけを記録する。token・secret・upstream の生本文・端末名はこの通知や HTTP 応答へ含めない。部分成功は Prometheus の scrape 自体は成功するため、欠測は sample の不在と exporter のログで確認する。
+欠測が生じた scrape は標準エラーへ欠測端末数だけを記録する。token・secret・upstream の生本文はこの通知や HTTP 応答へ含めない。端末名は欠測通知や HTTP 500 のエラー応答へ含めない。HTTP 200 では正常端末の `device_name` ラベルを公開する。部分成功は Prometheus の scrape 自体は成功するため、欠測は sample の不在と exporter のログで確認する。
 
 Issue #87 で、端末一台の失敗でも全体を HTTP 500 とする契約から変更した。正常時の metric 名・label・順序は変わらない。失敗時の HTTP 500 を前提にしている監視は、部分成功時の欠測も確認する必要がある。判断は [ADR 0003](adr/0003-device-failure-isolation.md) に記録する。
 
