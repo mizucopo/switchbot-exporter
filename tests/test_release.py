@@ -8,13 +8,20 @@ from io import BytesIO
 from pathlib import Path
 from types import ModuleType
 from urllib import error
+from urllib.response import addinfourl
 
 import pytest
 from pytest_mock import MockerFixture
 
 RELEASE_PATH = Path(__file__).resolve().parents[1] / ".github/scripts/release.py"
 REPOSITORY_URL = "https://hub.docker.com/v2/repositories/mizucopo/switchbot-exporter/"
-TAG_URL = REPOSITORY_URL + "tags/2.0.2/"
+REGISTRY_TOKEN_URL = (
+    "https://auth.docker.io/token?service=registry.docker.io"
+    "&scope=repository%3Amizucopo%2Fswitchbot-exporter%3Apull"
+)
+MANIFEST_URL = (
+    "https://registry-1.docker.io/v2/mizucopo/switchbot-exporter/manifests/2.0.2"
+)
 IMAGE = {
     "name": "exporter",
     "repository": "mizucopo/switchbot-exporter",
@@ -94,9 +101,16 @@ def release_controller() -> ModuleType:
     return module
 
 
-def docker_hub_error(status: int) -> error.HTTPError:
-    """Docker HubのHTTP照会失敗が再現されること。"""
-    return error.HTTPError(REPOSITORY_URL, status, "lookup failed", Message(), None)
+def registry_error(status: int, url: str = REPOSITORY_URL) -> error.HTTPError:
+    """公開先のHTTP照会失敗が再現されること。"""
+    return error.HTTPError(url, status, "lookup failed", Message(), None)
+
+
+def manifest_response(digest: str) -> addinfourl:
+    """Registry manifestのdigestを含むHEAD応答が用意されること。"""
+    headers = Message()
+    headers["Docker-Content-Digest"] = digest
+    return addinfourl(BytesIO(b""), headers, MANIFEST_URL, code=200)
 
 
 def test_public_repository_is_checked_without_credentials(
@@ -106,16 +120,20 @@ def test_public_repository_is_checked_without_credentials(
 ) -> None:
     """公開リポジトリの未使用タグが認証情報なしで確認されること。
 
-    Arrange: 公開リポジトリと未使用タグを返すDocker Hub APIが用意されること。
-    Act: 認証情報なしで公開APIのimage digest照会が実行されること。
-    Assert: 匿名の照会によりタグが未使用として報告されること。
+    Arrange: 公開リポジトリと匿名token、未使用タグのRegistry応答が用意されること。
+    Act: 利用者の認証情報なしでimage digest照会が実行されること。
+    Assert: 匿名tokenのmanifest HEAD照会によりタグが未使用と報告されること。
     """
     # Arrange
     monkeypatch.delenv("DOCKERHUB_USERNAME", raising=False)
     monkeypatch.delenv("DOCKERHUB_TOKEN", raising=False)
     lookup = mocker.patch(
-        "urllib.request.urlopen",
-        side_effect=[BytesIO(b"{}"), docker_hub_error(404)],
+        "urllib.request.OpenerDirector.open",
+        side_effect=[
+            BytesIO(b"{}"),
+            BytesIO(b'{"token":"anonymous-registry-token"}'),
+            registry_error(404, MANIFEST_URL),
+        ],
     )
 
     # Act
@@ -124,25 +142,43 @@ def test_public_repository_is_checked_without_credentials(
     # Assert
     assert digest is None
     requests = [call.args[0] for call in lookup.call_args_list]
-    assert [request.full_url for request in requests] == [REPOSITORY_URL, TAG_URL]
-    assert all(request.get_header("Authorization") is None for request in requests)
+    assert [request.full_url for request in requests] == [
+        REPOSITORY_URL,
+        REGISTRY_TOKEN_URL,
+        MANIFEST_URL,
+    ]
+    assert [request.get_method() for request in requests] == ["GET", "GET", "HEAD"]
+    assert all(request.get_header("Authorization") is None for request in requests[:2])
+    assert requests[2].get_header("Authorization") == "Bearer anonymous-registry-token"
 
 
 @pytest.mark.parametrize(
     ("credentials", "responses"),
     [
-        pytest.param(False, (docker_hub_error(404),), id="unknown-repository"),
-        pytest.param(False, (docker_hub_error(403),), id="repository-forbidden"),
-        pytest.param(False, (docker_hub_error(500),), id="repository-unavailable"),
+        pytest.param(False, (registry_error(404),), id="unknown-repository"),
+        pytest.param(False, (registry_error(403),), id="repository-forbidden"),
+        pytest.param(False, (registry_error(500),), id="repository-unavailable"),
         pytest.param(
             False, (error.URLError("network unavailable"),), id="network-error"
         ),
         pytest.param(False, (b"invalid json",), id="malformed-response"),
-        pytest.param(False, (b"{}", docker_hub_error(403)), id="tag-forbidden"),
-        pytest.param(False, (b"{}", docker_hub_error(500)), id="tag-unavailable"),
-        pytest.param(False, (b"{}", b'{"digest":"unknown"}'), id="unverifiable-digest"),
-        pytest.param(True, (docker_hub_error(404),), id="authentication-not-found"),
-        pytest.param(True, (docker_hub_error(403),), id="authentication-forbidden"),
+        pytest.param(
+            False,
+            (b"{}", b'{"token":"registry-token"}', registry_error(403, MANIFEST_URL)),
+            id="tag-forbidden",
+        ),
+        pytest.param(
+            False,
+            (b"{}", b'{"token":"registry-token"}', registry_error(500, MANIFEST_URL)),
+            id="tag-unavailable",
+        ),
+        pytest.param(
+            False,
+            (b"{}", b'{"token":"registry-token"}', manifest_response("unknown")),
+            id="unverifiable-digest",
+        ),
+        pytest.param(True, (registry_error(404),), id="authentication-not-found"),
+        pytest.param(True, (registry_error(403),), id="authentication-forbidden"),
         pytest.param(True, (b"{}",), id="missing-access-token"),
     ],
 )
@@ -151,12 +187,12 @@ def test_registry_authentication_or_lookup_failure_fails_closed(
     monkeypatch: pytest.MonkeyPatch,
     mocker: MockerFixture,
     credentials: bool,
-    responses: tuple[bytes | error.HTTPError | error.URLError, ...],
+    responses: tuple[bytes | addinfourl | error.HTTPError | error.URLError, ...],
 ) -> None:
     """認証または照会に失敗した場合にfail-closedとなること。
 
-    Arrange: 認証またはimage digest照会に失敗するDocker Hub APIが用意されること。
-    Act: 公開APIのimage digest照会が実行されること。
+    Arrange: 認証またはmanifest HEAD照会に失敗する公開先の応答が用意されること。
+    Act: Hubの可視性確認とRegistryのimage digest照会が実行されること。
     Assert: 照会が失敗し、タグの未使用が報告されないこと。
     """
     # Arrange
@@ -166,7 +202,7 @@ def test_registry_authentication_or_lookup_failure_fails_closed(
         monkeypatch.setenv("DOCKERHUB_USERNAME", "test-user")
         monkeypatch.setenv("DOCKERHUB_TOKEN", "test-token")
     mocker.patch(
-        "urllib.request.urlopen",
+        "urllib.request.OpenerDirector.open",
         side_effect=[
             BytesIO(response) if isinstance(response, bytes) else response
             for response in responses
