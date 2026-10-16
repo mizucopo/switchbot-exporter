@@ -30,7 +30,7 @@ from types import SimpleNamespace
 from typing import Any
 from urllib import error, request
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 TOKEN = "distribution-mock-token"
 # 公開済みの架空入力だけを使い、実環境の認証値は読み込まない。
 PUBLIC_TEST_HMAC_INPUT = "distribution-mock-secret"

@@ -69,7 +69,7 @@ impl Switchbot {
             if certificates.is_empty() {
                 bail!("Configured CA bundle contains no certificates");
             }
-            // RequestsのCA overrideと同じく、指定したbundleのみを信頼する。
+            // 独自CAが指定された場合は、そのbundleのみを信頼する。
             builder = builder.tls_certs_only(certificates);
         }
         let http = builder

@@ -16,7 +16,7 @@ fn status(value: Value) -> Map<String, Value> {
 /// 七種類のメトリクス名・型・ラベル・出力順序が維持されること。
 /// Arrange: 全メトリクスと対象外フィールドが用意されること。
 /// Act: デバイスのメトリクスが描画されること。
-/// Assert: Python 版の公開形式と同じテキストが返されること。
+/// Assert: 定義された Prometheus text 形式で返されること。
 #[test]
 fn all_metric_families_keep_names_types_labels_and_order() {
     // Arrange
@@ -111,7 +111,7 @@ fn label_special_characters_are_escaped_without_changing_unicode() {
 /// 重複 ID が初回順序を保ち、最後の名前が全メトリクスへ反映されること。
 /// Arrange: 二台と一部フィールドだけを更新する重複 ID が用意されること。
 /// Act: 各デバイスのメトリクスが追加されること。
-/// Assert: 値の更新順序と共有名が Python の辞書と一致すること。
+/// Assert: 最初の出現順序と最後に定義された値・名前が保持されること。
 #[test]
 fn duplicate_ids_update_values_and_shared_names_without_reordering() {
     // Arrange

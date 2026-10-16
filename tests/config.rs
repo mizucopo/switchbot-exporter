@@ -87,10 +87,10 @@ fn missing_credentials_identify_the_required_variable() {
     }
 }
 
-/// 空の認証値が未定義と区別され、環境変数互換性が保たれること。
+/// 空の認証値が未定義と区別されること。
 /// Arrange: 定義済みの空の token と secret が用意されること。
 /// Act: 設定が生成されること。
-/// Assert: python-decouple と同様に空の値が保持されること。
+/// Assert: 定義された空の値が保持されること。
 #[test]
 fn defined_empty_credentials_are_preserved() {
     // Arrange
@@ -186,12 +186,12 @@ fn invalid_numeric_settings_are_rejected() {
     }
 }
 
-/// .env の引用符・空白・コメント・重複キーの互換性が保たれること。
-/// Arrange: python-decouple で読み込める .env テキストが用意されること。
+/// .env の引用符・空白・コメント・重複キーが解析されること。
+/// Arrange: 引用符・空白・コメント・重複キーを含む .env が用意されること。
 /// Act: .env の値が解析されること。
 /// Assert: 展開を行わず値と最終定義が保持されること。
 #[test]
-fn dotenv_parser_preserves_python_decouple_values() {
+fn dotenv_parser_preserves_literal_values_and_last_definition() {
     // Arrange
     let contents = "\n # comment\n TOKEN = \"quoted = # value\"\n SINGLE='日本語'\n RAW=literal # text\n EMPTY=\n DUP=old\n DUP=new\n REF=${TOKEN}\n not_an_assignment\n";
 

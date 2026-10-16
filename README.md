@@ -5,7 +5,7 @@ SwitchBot API のステータスを Prometheus に公開する Rust 製 exporter
 
 ## 利用方法
 
-Docker image に加え、GitHub Release で Linux x64・Windows x64/ARM64・macOS ARM64 の実行バイナリを配布します。[バイナリの導入・設定・停止](docs/native-distribution.md)を参照してください。Rust 版への移行前に [移行ガイド](docs/rust-migration.md) を確認してください。
+Docker image に加え、GitHub Release で Linux x64・Windows x64/ARM64・macOS ARM64 の実行バイナリを配布します。[バイナリの導入・設定・停止](docs/native-distribution.md)と[対応機種・メトリクス・HTTP 仕様](docs/exporter.md)を参照してください。
 
 ```sh
 docker pull mizucopo/switchbot-exporter:latest
@@ -24,14 +24,14 @@ Docker では `--env-file` を使うか、`/app/.env` にファイルを mount �
 | `SWITCHBOT_API_TOKEN` | ◯ | — | SwitchBot API token |
 | `SWITCHBOT_API_SECRET` | ◯ | — | SwitchBot API secret |
 | `SERVER_PORT` | | `9171` | `0.0.0.0` で listen する port。Docker でも適用 |
-| `CACHE_DIR` | | `/tmp/switchbot` | 旧設定との互換用。空文字なら cache 無効。ディスクには書き込まない |
+| `CACHE_DIR` | | `/tmp/switchbot` | 空文字ならメモリ cache 無効。非空値のパスは使用せず、ディスクには書き込まない |
 | `CACHE_EXPIRE_SECOND` | | `600` | URL ごとの共有メモリ cache TTL。0 以下なら cache 無効 |
 | `DELAY_SECOND` | | `1` | 成功した API GET の後の待機秒数。小数・0 を指定可能 |
 | `API_TIMEOUT_SECOND` | | `30` | API GET の送信から本文受信までの timeout 秒数。正の有限値 |
 | `REQUESTS_CA_BUNDLE` | | 未設定 | HTTPS 検証に使う PEM CA bundle ファイル。指定時はこの bundle のみを信頼 |
 | `CURL_CA_BUNDLE` | | 未設定 | `REQUESTS_CA_BUNDLE` が未設定または空のときの CA bundle |
 
-proxy は `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY`（小文字表記も可）をプロセス環境から読み込みます。Docker の `--env-file` や shell の `export` で渡してください。独自 CA を使う場合は PEM bundle を container 内へ mount し、そのパスを指定します。CA directory を使用していた場合は [移行ガイド](docs/rust-migration.md) を確認してください。
+proxy は `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY`（小文字表記も可）をプロセス環境から読み込みます。Docker の `--env-file` や shell の `export` で渡してください。独自 CA を使う場合は PEM bundle ファイルを container 内へ mount し、そのパスを指定します。CA directory は指定できません。
 
 認証情報は最初の取得時に読み込みます。欠落や不正設定、API エラー、JSON エラーは `/metrics` の HTTP 500 として返し、部分的なメトリクスは返しません。認証なしでも exporter の起動・help・version 確認はできます。
 cache は単一プロセス内で共有され、同時 scrape の API 取得は直列化されます。cache hit では待機も API 呼び出しも行いません。再起動時には cache が空になります。
@@ -62,14 +62,9 @@ cargo build --release --locked
 
 Rust テストはローカル HTTP mock と仮想時計で API 認証・取得・TTL・待機・エラー・HTTP route を確認します。実機 SwitchBot の操作や性能計測は行いません。
 native PR CI と Release の各対象runnerでは共通controllerのarchive・SHA-256・展開済み実行ファイルに加え、ローカルTLS/proxy mockによる設定読込・既存メトリクス・cache・エラー・timeout・処理中のscrapeを含む正常終了を確認します。Windows ARM64とmacOS ARM64もnative実行し、クロスビルドだけの確認とは区別します。
-採番 controller の既存回帰テストには Python 3.14 と uv を使用します。これは開発・CI 用で、配布 image に Python は含みません。
+Rust 品質チェックと採番・公開は repo-template の生成物を使用します。共通 controller の回帰テストは repo-template 側で管理します。製品固有の配布検証は `.github/scripts/release_smoke.py` で行います。
 
-```sh
-uv sync --locked
-uv run task check
-```
-
-Docker は Alpine Linux / musl を使い、`linux/amd64` と `linux/arm64` に対応します。CA証明書と `Asia/Tokyo` のtimezone dataを含み、起動コマンド・設定・実行UIDは従来どおりです。[Alpine 化の判断](docs/adr/0002-alpine-runtime.md)と検証範囲を記録しています。軽量化幅や性能は計測していません。
+Docker は Alpine Linux / musl を使い、`linux/amd64` と `linux/arm64` に対応します。CA証明書と `Asia/Tokyo` のtimezone dataを含みます。[Alpine 採用の判断](docs/adr/0002-alpine-runtime.md)と検証範囲を記録しています。
 
 PR CI は両方の native runner で、外部ネットワークを無効にしたmusl版の統合テストとruntime imageのsmokeを実行します。統合テストはローカルHTTPS・独自CA・proxyも確認します。ビルド用ツールとテスト用fixtureは配布imageには含みません。
 

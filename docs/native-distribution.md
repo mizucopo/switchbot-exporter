@@ -13,7 +13,7 @@ Windows archiveには `switchbot-exporter.exe`、Linux/macOS archiveには `swit
 
 ## 前提と検証
 
-実行にRust・Python・uvは不要です。Windows 10/11は対応architectureの[Microsoft Visual C++ v14 Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)が必要です。LinuxはGNU/glibc環境向けです。Ubuntuのnative runnerでビルドするため、そのrunnerと互換のglibcを用意してください。Alpine/muslではDocker imageを使用します。macOSはApple Silicon向けです。署名・notarizationは提供していません。
+配布した実行ファイルを直接起動できます。Windows 10/11は対応architectureの[Microsoft Visual C++ v14 Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)が必要です。LinuxはGNU/glibc環境向けです。Ubuntuのnative runnerでビルドするため、そのrunnerと互換のglibcを用意してください。Alpine/muslではDocker imageを使用します。macOSはApple Silicon向けです。署名・notarizationは提供していません。
 
 WindowsはPowerShellでSHA-256を照合し、ZIPを展開します。
 
@@ -51,7 +51,7 @@ export SERVER_PORT=9171
 ./switchbot-exporter exporter
 ```
 
-`http://localhost:9171/metrics` をPrometheusでscrapeします。`SERVER_PORT` は `0.0.0.0` でlistenするportです。設定一覧とHTTP 500の扱いは[README](../README.md#利用方法)を参照してください。`CACHE_DIR` は旧設定との互換用の有効化フラグで、Windowsでも `/tmp/switchbot` へファイルを書きません。
+`http://localhost:9171/metrics` をPrometheusでscrapeします。`SERVER_PORT` は `0.0.0.0` でlistenするportです。設定一覧とHTTP 500の扱いは[README](../README.md#利用方法)を参照してください。`CACHE_DIR` が空文字ならメモリcacheを無効にします。非空値のパスは使用せず、Windowsでも `/tmp/switchbot` へファイルを書きません。
 
 TLSはRustlsを使います。通常のHTTPS検証に加え、独自CAを使う場合は `REQUESTS_CA_BUNDLE`（空・未設定なら `CURL_CA_BUNDLE`）にPEMファイルのパスを指定します。指定時はそのbundleのみを信頼します。パスはプロセスの作業ディレクトリに対する相対パス、または絶対パスです。空白・日本語を含むパスも使え、`.env` は `REQUESTS_CA_BUNDLE='C:\certs with spaces\CA.pem'` のように引用します。shellの `~` や変数は `.env` 内では展開されません。
 

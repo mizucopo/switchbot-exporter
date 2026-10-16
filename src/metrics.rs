@@ -31,7 +31,7 @@ impl Metrics {
                     bail!("SwitchBot metric {key} is not numeric");
                 }
                 let sample = (device.device_id.clone(), value.to_string());
-                // Python の dict と同じく、重複IDは最初の順序で値を更新する。
+                // 重複IDは最初の出現順序を保ち、値だけを更新する。
                 if let Some(existing) = self.samples[index]
                     .iter_mut()
                     .find(|(id, _)| id == &device.device_id)

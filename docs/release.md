@@ -36,8 +36,6 @@ Git tag、draft を含む Release、設定した image tag の未使用を確認
 
 後続 job は採番 commit の SHA を checkout する。GITHUB_SHA は元イベントの SHA のままなので、公開対象には使わない。タグ作成による別 workflow の起動を待たず、同じ run の後続 job で完結させる。
 
-Rust Docker の `Build and validate native image` は runner の architecture での検証であり、公開 image の完成確認ではない。続く `Build and push immutable image` で amd64 / arm64 の両方をビルドし、公開 image の確認後に GitHub Release を作成する。採番 commit・タグが存在して Release がまだない場合は、同じ run の現在の step とログを確認し、実行中・skip・失敗を区別する。実行中の build を、Release が未作成という理由だけで再実行しない。
-
 全検証・配布物が完成してから Release を公開する。GitHub Latest・Docker latest は最新の完成済み安定版 Release にだけ更新する。汎用 GitHub Release、Docker、Docker project、Tauri の prerelease は Latest の照会・昇格対象外で、初回公開でも Latest を変更しない。過去に通常 Release として公開された prerelease も採番記録から除外する。Tauri の prerelease は Tap 通知の対象外。
 
 Release 作成応答の ID を後続の asset 添付・配布案内・draft 公開へ引き継ぐため、作成直後の一覧反映を待たずに完了できる。再実行時は全ページの一覧から既存 Release と重複を確認し、完成済み asset を保持する。
