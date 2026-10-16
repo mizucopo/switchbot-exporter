@@ -25,18 +25,20 @@
 
 ## Tests
 
-- Use function-based Rust integration tests and pytest tests for release-controller tooling.
+- Use function-based Rust integration tests.
 - Write test comments and docstrings in Japanese.
 - Test observable behavior and results, not implementation details or private methods directly.
 - Minimize mocks. Use real instances for domain logic and mock only external boundaries such as DB, API, and SMTP.
 - Separate domain logic from IO using Humble Object or Hexagonal patterns where needed for testability.
-- Mirror Rust source modules under `tests/` and place Actions regression tests under `.github/tests/`. Use English test function names that describe business requirements.
+- Mirror Rust source modules under `tests/`. Use English test function names that describe business requirements.
 - Use explicit Arrange, Act, Assert sections in each test:
   - In Japanese test documentation, include `Arrange:`, `Act:`, and `Assert:` lines describing each step.
   - In the function body, use language-appropriate Arrange / Act / Assert comment dividers.
 - Describe each test in a Japanese docstring using passive `〜こと` phrasing consistently, including the title and each step.
 
-## CI helpers
+## Quality and distribution checks
 
-- GitHub Actions keeps its Python helpers, dependencies, and quality gate under `.github/`. Ordinary Rust development uses the Rust gate.
-- Preserve the shared controller and existing CI coverage. Python is not an exporter runtime dependency.
+- Run the Rust quality gate with `--locked` for Clippy and tests, then run `cargo build --release --locked`.
+- Keep configuration, metrics, API access, HTTP handling, and CLI in separate Rust modules. Use local HTTP mocks and virtual-time checks for TTL and delay.
+- Preserve the template-managed release controller. Its regression tests belong in `repo-template`.
+- Keep packaged exporter checks in `.github/scripts/release_smoke.py`. It uses only the standard library to verify the CLI, configuration, mock API, TLS/proxy, HTTP, and shutdown on each native distribution target.

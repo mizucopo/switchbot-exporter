@@ -36,8 +36,6 @@ Git tag、draft を含む Release、設定した image tag の未使用を確認
 
 後続 job は採番 commit の SHA を checkout する。GITHUB_SHA は元イベントの SHA のままなので、公開対象には使わない。タグ作成による別 workflow の起動を待たず、同じ run の後続 job で完結させる。
 
-Rust Docker の `Build and validate native image` は runner の architecture での検証であり、公開 image の完成確認ではない。続く `Build and push immutable image` で amd64 / arm64 の両方をビルドし、公開 image の確認後に GitHub Release を作成する。採番 commit・タグが存在して Release がまだない場合は、同じ run の現在の step とログを確認し、実行中・skip・失敗を区別する。実行中の build を、Release が未作成という理由だけで再実行しない。
-
 全検証・配布物が完成してから Release を公開する。GitHub Latest・Docker latest は最新の完成済み安定版 Release にだけ更新する。汎用 GitHub Release、Docker、Docker project、Tauri の prerelease は Latest の照会・昇格対象外で、初回公開でも Latest を変更しない。過去に通常 Release として公開された prerelease も採番記録から除外する。Tauri の prerelease は Tap 通知の対象外。
 
 Release 作成応答の ID を後続の asset 添付・配布案内・draft 公開へ引き継ぐため、作成直後の一覧反映を待たずに完了できる。再実行時は全ページの一覧から既存 Release と重複を確認し、完成済み asset を保持する。
@@ -48,13 +46,21 @@ Release の分類は共通公開計画で採番済み VERSION と方式から決
 
 Docker image tag は展開後の `+` を `_` に変換する（例 `1.2.3+build.1` → `1.2.3_build.1`）。SemVer に `_` は使えないため prerelease の `-` と衝突せず、Git version・tag・Release 名は元の値を保持する。有効な既存 image tag は変わらない。変換後にも tag の長さ・形式・使用済み状態・所有者を検証する。
 
+Docker Release の公開後確認は `image-verify` で同じ immutable tag を最大 6 回照会し、不在の間だけ 5 秒間隔で待つ（待機は最大 5 回・計 25 秒、HTTP request の timeout は各 30 秒）。Docker Hub は既知 repository の Registry manifest HEAD の 404、ECR は ImageNotFoundException が待機対象。repository 自体の 404、401/403、429、5xx、redirect、通信失敗・timeout、不正 digest は再試行せず失敗する。上限到達時は試行回数と間隔を error に示し、GitHub Release の作成・公開と latest 昇格へ進まない。途中ログには試行回数と待機間隔だけを載せ、認証 token や応答本文は載せない。
+
+Docker Hub の共通 image 照会は、repository-level の権限・可視性確認を保ち、タグの存在と digest は実レジストリ `registry-1.docker.io` の manifest HEAD と `Docker-Content-Digest` で検証する。Hub のタグ管理 API は、Registry で取得できる image に対して古い情報や 404 を返すことがあるため使わない。採番時の衝突確認、`image-state`、`image-verify`、配布案内も同じ照会を使う。
+
+既存の `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` がある場合は Hub 用 JWT と Registry 用の `repository:<name>:pull` scope token を別々に取得する。PAT は固定 HTTPS の認証先だけへ渡し、各 bearer は対応する API だけへ送る。設定済み認証の失敗から匿名へ fallback せず、HTTP redirect も拒否する。資格情報がない公開 repository は匿名の Registry token で確認できる。Docker / OCI の manifest と index を受け入れ、digest の欠落・不正値は失敗にする。HEAD は image や layer を download しない。
+
+採番時の未使用判定と公開前の `image-state` は単発照会のまま維持する。確認中に image を再 build/push・上書きしない。部分公開後は元 run を再実行し、同じ commit/tag の所有権を検証した既存 image と完成済み native assets を再利用して、不足工程だけを続ける。公開直後の不在は反映遅延の可能性があるが、再試行成功だけで原因を断定しない。
+
 ## 配布案内
 
 汎用 Release・Docker Release・Docker project pipeline は、添付済み asset と公開設定の image を本文の管理ブロックに案内する。既存のリリースノート・手書き本文は保持し、再実行では同じブロックを更新する。Docker Hub はリンクと実際の version tag の PULL コマンドを載せ、ECR は ECR の PULL コマンドを載せる。公開先の照会失敗・未提供 image は公開前に停止する。
 
 Docker Release（Rust の有無にかかわらず）と Docker project pipeline は新規 Release を draft として作り、最終 image 照会と配布案内の本文更新が成功した時点で公開する。照会・本文更新が失敗した場合は draft のまま元 run を再実行する。
 
-`use_rust=true` の汎用 Release・Docker Release は `rust_release_targets` で通常の Rust CLI / Exporter の配布対象を選ぶ。既定は既存の Linux x64（GNU）。root Cargo package の default features で有効な全 executable を同梱し、library のみ・無効な optional CLI のみの場合は配布 archive を作らない。Tauri の bundle 経路とは独立している。
+`use_rust=true` の汎用 Release・Docker Release は `rust_release_targets` で通常の Rust CLI / Exporter の配布対象を選ぶ。既定は既存の Linux x64（GNU）。root Cargo package の default features で有効な全 executable を同梱し、library のみ・無効な optional CLI のみの場合は配布 archive を作らない。Tauri の bundle 経路とは独立しており、Python のみの project や Docker project pipeline にこの配布 job は生成しない。
 
 | Rust target                | Native runner                  | Archive                               |
 | -------------------------- | ------------------------------ | ------------------------------------- |
@@ -72,6 +78,14 @@ Docker Release（Rust の有無にかかわらず）と Docker project pipeline 
 ### 製品固有処理との境界
 
 共通処理は target 選択・Cargo artifact 収集・命名・archive・checksum・最小 smoke・公開保護を所有する。OS の追加依存を導入する step は製品の生成済み `rust-builds` job に追記し、Copier update の three-way merge で保持・確認する。追加同梱物は製品が所有する script を `.github/release.json` の `publication.rust.stage_command`（既定 `[]`、shell を介さない argv）から呼ぶ。hook の作業 directory は project root、`RUST_RELEASE_STAGE_DIR` は executable を配置済みの一時 directory、`RUST_RELEASE_TARGET` / `RUST_RELEASE_TAG` は対象と tag。同梱する license・DLL・設定等を staging directory へコピーする。全 regular file を相対 path で同梱する。symlink は許可しない。hook の失敗、executable の削除・起動失敗は公開を止める。
+
+```json
+"rust": {
+  "targets": ["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc", "aarch64-apple-darwin"],
+  "smoke_args": ["--help"],
+  "stage_command": ["python", "scripts/package-release.py"]
+}
+```
 
 製品固有の CLI 引数は `smoke_args` を変更する。GUI や外部サービスへの接続確認、独自 archive、既存 checksum の形式、依存・license 検証、既存の公開保護を持つ製品は、製品 Issue で接続方法と追加 smoke を検討する。共通 template に製品名や製品依存を持ち込まない。この共通化だけで下流製品の release は変更されない。
 

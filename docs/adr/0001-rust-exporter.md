@@ -1,21 +1,21 @@
 # ADR 0001: Rust runtime とプロセス内共有 cache
 
-状態: 採用（Issue #60 の移植依頼）
+状態: 採用
 
 ## 背景
 
-既存 exporter は Python / Flask / Gunicorn、URL ごとのディスク cache、動的 inflect / inflection による metric 属性選択で構成されています。最新依頼は性能計測を行わず、Rust へ移植し、major 変更として扱うことです。
+SwitchBot API のステータスを取得し、Prometheus text と CLI の JSON として公開する。API の呼び出し間隔と cache TTL を制御し、同時 scrape による重複取得を抑える必要がある。
 
 ## 判断
 
-axum / tokio を HTTP と非同期処理、reqwest / rustls を API GET、serde を JSON、hmac / sha2 / base64 を署名に使用します。Prometheus text は既存 HELP / TYPE / family順を保つ明示的な7項目 mapping で生成します。
+axum / tokio を HTTP と非同期処理、reqwest / rustls を API GET、serde を JSON、hmac / sha2 / base64 を署名に使用する。Prometheus text は7項目の明示的な mapping で生成する。
 
-HTTP application state は一つの SwitchBot client を遅延生成し、mutex で同時 scrape と URL cache を共有します。API GET は順序を保持し、各成功 response 後に設定 delay を設けます。TTL は monotonic clock で判断し、ディスク I/O を行いません。
+HTTP application state は一つの SwitchBot client を遅延生成し、mutex で同時 scrape と URL ごとの cache を共有する。API GET は順序を保持し、各成功 response 後に設定 delay を設ける。TTL は monotonic clock で判断し、ディスク I/O を行わない。
 
-API request には設定可能な全体 timeout を設けます。エラー時は scrape 全体を失敗させます。SIGINT / SIGTERM で HTTP server を graceful shutdown します。認証情報はログ・HTTP error bodyへ出しません。
+API request には設定可能な全体 timeout を設ける。エラー時は scrape 全体を失敗させる。SIGINT / SIGTERM と Windows の Ctrl+C / Ctrl+Break で HTTP server を graceful shutdown する。認証情報はログ・HTTP error body へ出さない。
 
 ## 影響
 
-単一 binary / 単一プロセスとなり、Python 起動方法と持続 cache は廃止します。設定・CLI形式・escape の変更は [移行ガイド](../rust-migration.md) に記録します。Docker 配布と SemVer 採番は維持し、version source を Cargo manifest / lock へ移します。
+単一 binary / 単一プロセスで動作し、cache は再起動時に空になる。設定と利用方法は [README](../../README.md)、取得対象・HTTP・メトリクスの契約は [exporter 仕様](../exporter.md) に記録する。
 
-実機や本番を利用しない mock による機能・互換性検証を行います。性能改善は未計測です。PR #66 由来の共通 release controller と上流 #169 / #170 の修正は対象外です。
+version source は Cargo manifest / lock とし、Docker と native binary の配布には repo-template の共通 release controller を使用する。機能検証はローカル HTTP / TLS / proxy mock と仮想時計で行う。

@@ -104,7 +104,7 @@ fn load_values_with_validation(
     is_consumed_setting: impl Fn(&str, &Values) -> bool,
 ) -> Result<Values> {
     let mut values = Values::new();
-    // python-decouple と同じく、最初に見つかった .env のみを読み込む。
+    // 作業ディレクトリから親へ探索し、最初に見つかった .env のみを読み込む。
     for ancestor in directory.ancestors() {
         let path = ancestor.join(".env");
         match fs::read_to_string(&path) {

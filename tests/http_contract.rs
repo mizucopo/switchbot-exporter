@@ -210,7 +210,7 @@ impl Drop for ControlledClock {
 }
 
 /// 固定の timestamp に対して既存 API の HMAC-SHA256 署名が生成されること。
-/// Arrange: Python と同じ token・secret・ミリ秒 timestamp が用意されること。
+/// Arrange: 固定の token・secret・ミリ秒 timestamp が用意されること。
 /// Act: 署名が生成されること。
 /// Assert: 空 nonce の既知ベクトルと一致すること。
 #[test]
