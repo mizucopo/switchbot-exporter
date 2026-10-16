@@ -23,13 +23,18 @@ pub struct Metrics {
 
 impl Metrics {
     pub fn add(&mut self, device: &Device, status: &Map<String, Value>) -> Result<()> {
+        // 端末の全項目を検証してから追加し、不正端末の一部だけを公開しない。
+        for (key, _, _) in FAMILIES {
+            if let Some(value) = status.get(key)
+                && !value.is_number()
+            {
+                bail!("SwitchBot metric {key} is not numeric");
+            }
+        }
         self.names
             .insert(device.device_id.clone(), device.device_name.clone());
         for (index, (key, _, _)) in FAMILIES.iter().enumerate() {
             if let Some(value) = status.get(*key) {
-                if !value.is_number() {
-                    bail!("SwitchBot metric {key} is not numeric");
-                }
                 let sample = (device.device_id.clone(), value.to_string());
                 // 重複IDは最初の出現順序を保ち、値だけを更新する。
                 if let Some(existing) = self.samples[index]

@@ -12,7 +12,7 @@ axum / tokio を HTTP と非同期処理、reqwest / rustls を API GET、serde 
 
 HTTP application state は一つの SwitchBot client を遅延生成し、mutex で同時 scrape と URL ごとの cache を共有する。API GET は順序を保持し、各成功 response 後に設定 delay を設ける。TTL は monotonic clock で判断し、ディスク I/O を行わない。
 
-API request には設定可能な全体 timeout を設ける。エラー時は scrape 全体を失敗させる。SIGINT / SIGTERM と Windows の Ctrl+C / Ctrl+Break で HTTP server を graceful shutdown する。認証情報はログ・HTTP error body へ出さない。
+API request には設定可能な全体 timeout を設ける。失敗の扱いは [ADR 0003](0003-device-failure-isolation.md) に従い、端末別の失敗を隔離する。SIGINT / SIGTERM と Windows の Ctrl+C / Ctrl+Break で HTTP server を graceful shutdown する。認証情報はログ・HTTP error body へ出さない。
 
 ## 影響
 

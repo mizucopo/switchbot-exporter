@@ -85,34 +85,74 @@ impl Switchbot {
 
     pub async fn fetch_devices(&mut self) -> Result<Vec<Device>> {
         let url = self.base_url.join("/v1.1/devices")?;
-        let response = self.fetch(url).await?;
+        let response = self.fetch(url.clone()).await?;
         let devices = response
             .get("body")
             .and_then(|body| body.get("deviceList"))
-            .context("SwitchBot response is missing body.deviceList")?;
-        serde_json::from_value(devices.clone()).context("Invalid SwitchBot device list")
+            .context("SwitchBot response is missing body.deviceList")
+            .and_then(|devices| {
+                serde_json::from_value(devices.clone()).context("Invalid SwitchBot device list")
+            });
+        if devices.is_err() {
+            self.cache.remove(url.as_str());
+        }
+        devices
     }
 
     pub async fn fetch_device_status(&mut self, device_id: &str) -> Result<Value> {
+        self.fetch(self.device_status_url(device_id)?).await
+    }
+
+    fn device_status_url(&self, device_id: &str) -> Result<Url> {
         let mut url = self.base_url.clone();
         url.path_segments_mut()
             .map_err(|()| anyhow::anyhow!("Invalid SwitchBot base URL"))?
             .clear()
             .extend(["v1.1", "devices", device_id, "status"]);
-        self.fetch(url).await
+        Ok(url)
     }
 
     pub async fn fetch_metrics(&mut self) -> Result<Metrics> {
         let devices = self.fetch_devices().await?;
         let mut metrics = Metrics::default();
+        let mut successful_devices = 0;
+        let mut failed_devices = 0;
         for device in &devices {
             if DEVICE_TYPES.contains(&device.device_type.as_str()) {
-                let response = self.fetch_device_status(&device.device_id).await?;
-                let status = response
-                    .get("body")
-                    .and_then(Value::as_object)
-                    .context("SwitchBot status response is missing body")?;
-                metrics.add(device, status)?;
+                let url = self.device_status_url(&device.device_id)?;
+                let result = self.fetch(url.clone()).await.and_then(|response| {
+                    let status = response
+                        .get("body")
+                        .and_then(Value::as_object)
+                        .context("SwitchBot status response is missing body")?;
+                    metrics.add(device, status)
+                });
+                match result {
+                    Ok(()) => successful_devices += 1,
+                    Err(error) => {
+                        // 形式・値の検証に失敗した response も次回取得で再試行する。
+                        self.cache.remove(url.as_str());
+                        // 認証・権限異常は端末の欠測として隠さない。
+                        if error
+                            .downcast_ref::<reqwest::Error>()
+                            .and_then(reqwest::Error::status)
+                            .is_some_and(|status| {
+                                status == reqwest::StatusCode::UNAUTHORIZED
+                                    || status == reqwest::StatusCode::FORBIDDEN
+                            })
+                        {
+                            return Err(error);
+                        }
+                        failed_devices += 1;
+                    }
+                }
+            }
+        }
+        if failed_devices > 0 {
+            // 端末名・認証値・upstream の生本文はログにも含めない。
+            eprintln!("metrics scrape omitted {failed_devices} target device(s)");
+            if successful_devices == 0 {
+                bail!("All target device statuses failed");
             }
         }
         Ok(metrics)

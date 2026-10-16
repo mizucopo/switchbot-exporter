@@ -33,7 +33,8 @@ Docker では `--env-file` を使うか、`/app/.env` にファイルを mount �
 
 proxy は `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY`（小文字表記も可）をプロセス環境から読み込みます。Docker の `--env-file` や shell の `export` で渡してください。独自 CA を使う場合は PEM bundle ファイルを container 内へ mount し、そのパスを指定します。CA directory は指定できません。
 
-認証情報は最初の取得時に読み込みます。欠落や不正設定、API エラー、JSON エラーは `/metrics` の HTTP 500 として返し、部分的なメトリクスは返しません。認証なしでも exporter の起動・help・version 確認はできます。
+認証情報は最初の取得時に読み込みます。端末ごとの取得・変換に失敗しても残りの端末を取得し、正常端末のメトリクスを HTTP 200 で返します。失敗端末の値は欠測となり、0 や期限切れの過去値では補完しません。欠測端末数は標準エラーへ記録します。
+設定異常・一覧取得失敗・HTTP 401/403・全対象端末の取得失敗は HTTP 500 の固定本文を返します。対象端末ゼロは HELP / TYPE だけの HTTP 200 です。[失敗時の応答と cache の扱い](docs/exporter.md#失敗時の応答)を参照してください。認証なしでも exporter の起動・help・version 確認はできます。
 cache は単一プロセス内で共有され、同時 scrape の API 取得は直列化されます。cache hit では待機も API 呼び出しも行いません。再起動時には cache が空になります。
 
 ## ローカル実行
@@ -48,7 +49,7 @@ cargo build --release --locked
 ./target/release/switchbot-exporter metrics
 ```
 
-`devices` と `device-status` は JSON、`metrics` は Prometheus text を標準出力へ返します。
+`devices` と `device-status` は JSON、`metrics` は Prometheus text を標準出力へ返します。`metrics` も端末別の失敗を隔離し、部分成功は終了コード0、全体失敗は非0になります。
 `exporter` は Linux/macOS の SIGINT / SIGTERM、Windows の Ctrl+C / Ctrl+Break で新規接続の受付を止め、処理中のリクエストを終了して停止します。
 
 ## 開発と検証

@@ -121,7 +121,23 @@ class ProxyHandler(socketserver.BaseRequestHandler):
                         }
                     ]
                 }
+                if proxy.mode == "partial":
+                    body["deviceList"].insert(
+                        0,
+                        {
+                            "deviceId": "failed-device",
+                            "deviceName": "取得失敗",
+                            "deviceType": "Meter",
+                        },
+                    )
             else:
+                if path == "/v1.1/devices/failed-device/status":
+                    require(proxy.mode == "partial", "partial failure fixture")
+                    stream.sendall(
+                        b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n"
+                        b"Connection: close\r\n\r\n"
+                    )
+                    return
                 require(path == "/v1.1/devices/mock-device/status", "mock API path")
                 body = STATUS
                 if proxy.mode in ("timeout", "drain"):
@@ -297,9 +313,10 @@ def exporter_smoke(binary: Path, directory: Path, mode: str) -> None:
             else:
                 status, body = scrape()
             # Assert
-            if mode in ("success", "drain"):
+            if mode in ("success", "partial", "drain"):
                 require(status == 200, f"mock HTTP status: {status}: {body}")
                 check_metrics(body)
+                require("failed-device" not in body, "failed device is omitted")
             else:
                 require(
                     (status, body) == (500, "Internal Server Error"), "atomic error"
@@ -321,10 +338,35 @@ def exporter_smoke(binary: Path, directory: Path, mode: str) -> None:
                         check_metrics(output)
                     else:
                         require(bool(json.loads(output)), "CLI JSON")
+            if mode == "partial":
+                output = subprocess.run(
+                    [str(binary), "metrics"],
+                    cwd=nested,
+                    env=env,
+                    timeout=10,
+                    capture_output=True,
+                    check=True,
+                )
+                check_metrics(output.stdout.decode())
+                require("failed-device" not in output.stdout.decode(), "CLI omission")
+                require(
+                    "metrics scrape omitted 1 target device(s)"
+                    in output.stderr.decode(),
+                    "CLI partial failure notice",
+                )
             if mode != "drain":
                 stop(process)
             _, stderr = process.communicate(timeout=10)
             require(process.returncode == 0, f"graceful shutdown: {stderr.decode()}")
+            require(TOKEN not in stderr.decode(), "token is not logged")
+            require(
+                PUBLIC_TEST_HMAC_INPUT not in stderr.decode(), "secret is not logged"
+            )
+            if mode == "partial":
+                require(
+                    "metrics scrape omitted 1 target device(s)" in stderr.decode(),
+                    "HTTP partial failure notice",
+                )
             require(not proxy.failures, "mock failures: " + repr(proxy.failures))
             with socket.socket() as connection:
                 require(
@@ -388,11 +430,11 @@ def main() -> None:
             == f"switchbot-exporter {version}",
             "version",
         )
-        for mode in ("success", "error", "timeout", "drain"):
+        for mode in ("success", "partial", "error", "timeout", "drain"):
             exporter_smoke(binary, directory, mode)
     print(
         f"{args.target}: archive, SHA-256, config, mock API, "
-        "TLS/proxy, HTTP and shutdown passed"
+        "TLS/proxy, partial metrics, HTTP and shutdown passed"
     )
 
 
