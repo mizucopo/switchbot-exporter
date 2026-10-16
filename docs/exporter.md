@@ -44,6 +44,8 @@ family は表の順序、sample はデバイス一覧の順序で出力する。
 
 欠測が生じた scrape は標準エラーへ欠測端末数だけを記録する。token・secret・upstream の生本文はこの通知や HTTP 応答へ含めない。端末名は欠測通知や HTTP 500 のエラー応答へ含めない。HTTP 200 では正常端末の `device_name` ラベルを公開する。部分成功は Prometheus の scrape 自体は成功するため、欠測は sample の不在と exporter のログで確認する。
 
+API の失敗診断は CLI・HTTP server ともに、失敗の種類や HTTP status code など入力値を含まない情報に限定する。不正な一覧の値、要求 URL の端末 ID、HTTP の理由句は記録しない。成功時の `devices` / `device-status` の JSON 標準出力と、正常端末のメトリクス label は引き続き端末情報を含む。
+
 Issue #87 で、端末一台の失敗でも全体を HTTP 500 とする契約から変更した。正常時の metric 名・label・順序は変わらない。失敗時の HTTP 500 を前提にしている監視は、部分成功時の欠測も確認する必要がある。判断は [ADR 0003](adr/0003-device-failure-isolation.md) に記録する。
 
 ## 設定

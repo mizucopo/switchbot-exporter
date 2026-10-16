@@ -1,9 +1,9 @@
-use std::{collections::HashMap, fs, time::SystemTime};
+use std::{collections::HashMap, fmt, fs, time::SystemTime};
 
 use anyhow::{Context, Result, bail};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use hmac::{Hmac, KeyInit, Mac};
-use reqwest::{Certificate, Client, Url, header::HeaderValue};
+use reqwest::{Certificate, Client, StatusCode, Url, header::HeaderValue};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::Sha256;
@@ -44,6 +44,22 @@ struct CacheEntry {
     value: Value,
     fetched_at: Instant,
 }
+
+// 業務判定に必要な status だけを保持し、URL・理由句・応答値を診断へ渡さない。
+#[derive(Debug)]
+struct ApiHttpError(StatusCode);
+
+impl fmt::Display for ApiHttpError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "SwitchBot API returned an HTTP error ({})",
+            self.0.as_u16()
+        )
+    }
+}
+
+impl std::error::Error for ApiHttpError {}
 
 pub struct Switchbot {
     config: Config,
@@ -91,7 +107,8 @@ impl Switchbot {
             .and_then(|body| body.get("deviceList"))
             .context("SwitchBot response is missing body.deviceList")
             .and_then(|devices| {
-                serde_json::from_value(devices.clone()).context("Invalid SwitchBot device list")
+                serde_json::from_value(devices.clone())
+                    .map_err(|_| anyhow::anyhow!("Invalid SwitchBot device list"))
             });
         if devices.is_err() {
             self.cache.remove(url.as_str());
@@ -133,14 +150,9 @@ impl Switchbot {
                         // 形式・値の検証に失敗した response も次回取得で再試行する。
                         self.cache.remove(url.as_str());
                         // 認証・権限異常は端末の欠測として隠さない。
-                        if error
-                            .downcast_ref::<reqwest::Error>()
-                            .and_then(reqwest::Error::status)
-                            .is_some_and(|status| {
-                                status == reqwest::StatusCode::UNAUTHORIZED
-                                    || status == reqwest::StatusCode::FORBIDDEN
-                            })
-                        {
+                        if error.downcast_ref::<ApiHttpError>().is_some_and(|error| {
+                            error.0 == StatusCode::UNAUTHORIZED || error.0 == StatusCode::FORBIDDEN
+                        }) {
                             return Err(error);
                         }
                         failed_devices += 1;
@@ -184,13 +196,15 @@ impl Switchbot {
             .header("nonce", "")
             .send()
             .await
-            .context("SwitchBot API request failed")?
-            .error_for_status()
-            .context("SwitchBot API returned an HTTP error")?;
+            .map_err(|_| anyhow::anyhow!("SwitchBot API request failed"))?;
+        let status = response.status();
+        if status.is_client_error() || status.is_server_error() {
+            return Err(ApiHttpError(status).into());
+        }
         let body = response
             .bytes()
             .await
-            .context("Could not read SwitchBot response")?;
+            .map_err(|_| anyhow::anyhow!("Could not read SwitchBot response"))?;
         // キャッシュhitには待機せず、成功した実リクエストの後に待機する。
         let fetched_at = Instant::now();
         if !self.config.delay.is_zero() {
