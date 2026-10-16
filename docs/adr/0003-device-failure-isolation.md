@@ -14,7 +14,7 @@
 
 正常な URL cache の TTL と API GET 後の delay、各 request の timeout は維持する。形式・値の検証に失敗した端末 status と不正な一覧は cache から除外し、次回 scrape で再試行する。
 
-失敗の通知は標準エラーへの欠測端末数に限定する。新しい診断 metric は追加せず、認証値・upstream 本文・端末名は記録しない。HTTP と `metrics` CLI で同じ取得処理を使用する。
+端末欠測の通知は標準エラーへの欠測端末数に限定する。API の全体失敗は、入力値を含まない失敗の種類や HTTP status code で診断する。新しい診断 metric は追加せず、認証値・upstream 本文・端末情報は診断へ記録しない。HTTP と `metrics` CLI で同じ取得処理を使用する。
 
 ## 影響
 

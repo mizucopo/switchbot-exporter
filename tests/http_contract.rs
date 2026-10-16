@@ -24,7 +24,12 @@ use switchbot_exporter::{
     server,
     switchbot::{Device, Switchbot, signature},
 };
-use tokio::{net::TcpListener, sync::Notify, task::JoinHandle};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpListener,
+    sync::Notify,
+    task::JoinHandle,
+};
 use tower::ServiceExt;
 
 #[derive(Clone)]
@@ -1024,8 +1029,132 @@ async fn failed_device_statuses_are_retried_without_discarding_healthy_cache() {
     }
 }
 
+/// 不正な一覧の値が診断用のエラー詳細へ含まれないこと。
+/// Arrange: 認証値と端末情報を含む不正な文字列・配列・項目が用意されること。
+/// Act: 一覧の取得とエラーの通常・デバッグ表示が実行されること。
+/// Assert: 失敗理由が示され、入力値がどちらの表示にも含まれないこと。
+#[tokio::test]
+async fn malformed_device_list_diagnostics_do_not_disclose_upstream_values() {
+    // Arrange
+    let values = configuration();
+    let private_details = format!(
+        "raw-upstream-detail {} {} private-device-id 私室の端末",
+        values["SWITCHBOT_API_TOKEN"], values["SWITCHBOT_API_SECRET"]
+    );
+    for devices in [
+        json!(private_details),
+        json!([private_details]),
+        json!(987654321),
+        json!([{"deviceId": 987654321, "deviceName": "私室の端末"}]),
+        json!([{"deviceId": [private_details], "deviceName": "私室の端末"}]),
+    ] {
+        let api = MockApi::new(vec![(
+            "/v1.1/devices".to_owned(),
+            vec![devices_response(devices)],
+        )])
+        .await;
+
+        // Act
+        let error = api.client(&values).fetch_devices().await.unwrap_err();
+        let diagnostic = format!("{error:#}\n{error:?}");
+
+        // Assert
+        assert!(diagnostic.contains("Invalid SwitchBot device list"));
+        assert_no_upstream_details(&diagnostic, &values);
+        assert!(!diagnostic.contains("private-device-id"));
+        assert!(!diagnostic.contains("私室の端末"));
+        assert!(!diagnostic.contains("987654321"));
+    }
+}
+
+/// HTTP の理由句や本文読込失敗の URL が診断へ含まれないこと。
+/// Arrange: 機微値を含む理由句と途中で切れた本文を返すローカル API が用意されること。
+/// Act: 端末 ID を指定して status の取得が実行されること。
+/// Assert: HTTP status または本文読込の失敗が示され、応答値と端末 ID が含まれないこと。
+#[tokio::test]
+async fn upstream_http_and_body_error_diagnostics_do_not_disclose_device_details() {
+    // Arrange
+    let values = configuration();
+    let private_details = format!(
+        "raw-upstream-detail {} {} private-device-name",
+        values["SWITCHBOT_API_TOKEN"], values["SWITCHBOT_API_SECRET"]
+    );
+    let mut responses: Vec<_> = [401, 403, 503]
+        .map(|code| {
+            (
+                format!(
+                    "HTTP/1.1 {code} {private_details}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                ),
+                code.to_string(),
+            )
+        })
+        .into();
+    responses.push((
+        "HTTP/1.1 200 OK\r\nContent-Length: 100\r\nConnection: close\r\n\r\n{".to_owned(),
+        "Could not read SwitchBot response".to_owned(),
+    ));
+    for (response, expected) in responses {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url =
+            reqwest::Url::parse(&format!("http://{}", listener.local_addr().unwrap())).unwrap();
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut request = Vec::new();
+            while !request.windows(4).any(|part| part == b"\r\n\r\n") {
+                let mut buffer = [0; 1024];
+                let count = stream.read(&mut buffer).await.unwrap();
+                assert!(count > 0);
+                request.extend_from_slice(&buffer[..count]);
+            }
+            stream.write_all(response.as_bytes()).await.unwrap();
+        });
+        let mut client =
+            Switchbot::with_base_url(Config::from_values(&values).unwrap(), url).unwrap();
+
+        // Act
+        let error = client
+            .fetch_device_status("private-device-id/token?secret")
+            .await
+            .unwrap_err();
+        let diagnostic = format!("{error:#}\n{error:?}");
+        server.await.unwrap();
+
+        // Assert
+        assert!(diagnostic.contains(&expected), "{diagnostic}");
+        assert_no_upstream_details(&diagnostic, &values);
+        assert!(!diagnostic.contains("private-device-id"));
+        assert!(!diagnostic.contains("private-device-name"));
+    }
+}
+
+/// timeout の診断へ要求 URL の端末 ID が含まれないこと。
+/// Arrange: 応答しない API と短い request timeout が用意されること。
+/// Act: 端末 status が取得されること。
+/// Assert: 通信失敗が返され、診断のどの表示にも端末 ID が含まれないこと。
+#[tokio::test]
+async fn request_timeout_diagnostics_do_not_disclose_device_identifiers() {
+    // Arrange
+    let api = MockApi::new(vec![]).await;
+    api.state.stalled.store(true, Ordering::Relaxed);
+    let mut values = configuration();
+    values.insert("API_TIMEOUT_SECOND".to_owned(), "0.01".to_owned());
+
+    // Act
+    let error = api
+        .client(&values)
+        .fetch_device_status("private-device-id")
+        .await
+        .unwrap_err();
+    let diagnostic = format!("{error:#}\n{error:?}");
+
+    // Assert
+    assert!(diagnostic.contains("SwitchBot API request failed"));
+    assert!(!diagnostic.contains("private-device-id"));
+    assert_no_upstream_details(&diagnostic, &values);
+}
+
 /// 不正な一覧形式が成功や cache として扱われず次回に再取得されること。
-/// Arrange: 必須項目が欠落した一覧と次回の正常な空一覧が用意されること。
+/// Arrange: 不正な文字列・配列・必須項目と次回の正常な空一覧が用意されること。
 /// Act: metrics endpoint が二回呼び出されること。
 /// Assert: 初回は HTTP 500、次回は一覧が再取得されメトリクス定義が返されること。
 #[tokio::test]
@@ -1036,6 +1165,8 @@ async fn malformed_device_lists_fail_the_scrape_and_are_retried() {
         json!({"body": {}}),
         json!({"body": {"deviceList": null}}),
         json!({"body": {"deviceList": [{"deviceId": "no-name"}]}}),
+        json!({"body": {"deviceList": "private-device-id"}}),
+        json!({"body": {"deviceList": ["private-device-id"]}}),
     ] {
         let api = MockApi::new(vec![(
             "/v1.1/devices".to_owned(),

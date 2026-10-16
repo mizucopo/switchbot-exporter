@@ -34,6 +34,18 @@ ROOT = Path(__file__).resolve().parents[2]
 TOKEN = "distribution-mock-token"
 # 公開済みの架空入力だけを使い、実環境の認証値は読み込まない。
 PUBLIC_TEST_HMAC_INPUT = "distribution-mock-secret"
+PRIVATE_DEVICE_ID = "private-device-id"
+PRIVATE_DEVICE_NAME = "private-room-device-name"
+PRIVATE_DETAILS = (
+    f"raw-upstream-detail {TOKEN} {PUBLIC_TEST_HMAC_INPUT} "
+    f"{PRIVATE_DEVICE_ID} {PRIVATE_DEVICE_NAME}"
+)
+DIAGNOSTIC_MODES = (
+    "invalid-list-string",
+    "invalid-list-array",
+    "invalid-json",
+    "private-http-error",
+)
 STATUS = {
     "battery": 88,
     "humidity": 55,
@@ -130,6 +142,14 @@ class ProxyHandler(socketserver.BaseRequestHandler):
                             "deviceType": "Meter",
                         },
                     )
+                if proxy.mode == "invalid-list-string":
+                    body["deviceList"] = PRIVATE_DETAILS
+                if proxy.mode == "invalid-list-array":
+                    body["deviceList"] = [PRIVATE_DETAILS]
+                if proxy.mode == "private-http-error":
+                    body["deviceList"][0].update(
+                        deviceId=PRIVATE_DEVICE_ID, deviceName=PRIVATE_DEVICE_NAME
+                    )
             else:
                 if path == "/v1.1/devices/failed-device/status":
                     require(proxy.mode == "partial", "partial failure fixture")
@@ -138,8 +158,19 @@ class ProxyHandler(socketserver.BaseRequestHandler):
                         b"Connection: close\r\n\r\n"
                     )
                     return
-                require(path == "/v1.1/devices/mock-device/status", "mock API path")
+                device_id = (
+                    PRIVATE_DEVICE_ID
+                    if proxy.mode == "private-http-error"
+                    else "mock-device"
+                )
+                require(path == f"/v1.1/devices/{device_id}/status", "mock API path")
                 body = STATUS
+                if proxy.mode == "private-http-error":
+                    stream.sendall(
+                        f"HTTP/1.1 401 {PRIVATE_DETAILS}\r\nContent-Length: 0\r\n"
+                        "Connection: close\r\n\r\n".encode()
+                    )
+                    return
                 if proxy.mode in ("timeout", "drain"):
                     proxy.pending.set()
                     proxy.resume.wait(timeout=10)
@@ -152,6 +183,8 @@ class ProxyHandler(socketserver.BaseRequestHandler):
                 if proxy.mode == "timeout":
                     return
             payload = json.dumps({"statusCode": 100, "body": body}).encode()
+            if proxy.mode == "invalid-json":
+                payload = ("{broken-json " + PRIVATE_DETAILS).encode()
             stream.sendall(
                 f"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
                 f"Content-Length: {len(payload)}\r\nConnection: close\r\n\r\n".encode()
@@ -214,6 +247,17 @@ def check_metrics(body: str) -> None:
             f'device_name="配布テスト"}} {value}' in body,
             "existing metrics contract: " + suffix,
         )
+
+
+def check_diagnostic_privacy(diagnostic: str) -> None:
+    for value in (
+        TOKEN,
+        PUBLIC_TEST_HMAC_INPUT,
+        PRIVATE_DEVICE_ID,
+        PRIVATE_DEVICE_NAME,
+        "raw-upstream-detail",
+    ):
+        require(value not in diagnostic, "API diagnostic excludes private values")
 
 
 def exporter_smoke(binary: Path, directory: Path, mode: str) -> None:
@@ -321,6 +365,29 @@ def exporter_smoke(binary: Path, directory: Path, mode: str) -> None:
                 require(
                     (status, body) == (500, "Internal Server Error"), "atomic error"
                 )
+            if mode in DIAGNOSTIC_MODES:
+                check_diagnostic_privacy(body)
+                if mode.startswith("invalid-list-"):
+                    require(scrape() == (500, "Internal Server Error"), "retry error")
+                    require(len(proxy.paths) == 2, "invalid list is not cached")
+                commands = (
+                    (["metrics"], ["device-status", PRIVATE_DEVICE_ID])
+                    if mode == "private-http-error"
+                    else (["devices"], ["metrics"])
+                )
+                for arguments in commands:
+                    output = subprocess.run(
+                        [str(binary), *arguments],
+                        cwd=nested,
+                        env=env,
+                        timeout=10,
+                        capture_output=True,
+                        check=False,
+                    )
+                    require(output.returncode != 0, "CLI reports API failure")
+                    require(output.stdout == b"", "failed CLI has no data output")
+                    require(bool(output.stderr), "CLI retains a failure diagnostic")
+                    check_diagnostic_privacy(output.stderr.decode())
             if mode == "success":
                 check_metrics(scrape()[1])
                 require(len(proxy.paths) == 2, "shared cache")
@@ -358,10 +425,7 @@ def exporter_smoke(binary: Path, directory: Path, mode: str) -> None:
                 stop(process)
             _, stderr = process.communicate(timeout=10)
             require(process.returncode == 0, f"graceful shutdown: {stderr.decode()}")
-            require(TOKEN not in stderr.decode(), "token is not logged")
-            require(
-                PUBLIC_TEST_HMAC_INPUT not in stderr.decode(), "secret is not logged"
-            )
+            check_diagnostic_privacy(stderr.decode())
             if mode == "partial":
                 require(
                     "metrics scrape omitted 1 target device(s)" in stderr.decode(),
@@ -430,11 +494,18 @@ def main() -> None:
             == f"switchbot-exporter {version}",
             "version",
         )
-        for mode in ("success", "partial", "error", "timeout", "drain"):
+        for mode in (
+            "success",
+            "partial",
+            "error",
+            "timeout",
+            "drain",
+            *DIAGNOSTIC_MODES,
+        ):
             exporter_smoke(binary, directory, mode)
     print(
         f"{args.target}: archive, SHA-256, config, mock API, "
-        "TLS/proxy, partial metrics, HTTP and shutdown passed"
+        "TLS/proxy, partial metrics, private diagnostics, HTTP and shutdown passed"
     )
 
 
