@@ -177,3 +177,29 @@ fn non_numeric_metric_values_are_rejected() {
     // Assert
     assert!(results.into_iter().all(|result| result.is_err()));
 }
+
+/// 不正な端末の追加で既存サンプルとラベルが変更されないこと。
+/// Arrange: 正常な端末と、後続項目に不正値を含む同一・別 ID が用意されること。
+/// Act: 各不正端末の追加が試行されること。
+/// Assert: 途中の正常値も新しい名前も反映されず、元の出力が保たれること。
+#[test]
+fn invalid_device_status_preserves_existing_samples_and_labels() {
+    // Arrange
+    let mut metrics = Metrics::default();
+    metrics
+        .add(&device("good", "正常"), &status(json!({"battery": 88})))
+        .unwrap();
+    let before = metrics.render();
+
+    // Act
+    for id in ["good", "broken"] {
+        let result = metrics.add(
+            &device(id, "不正な更新"),
+            &status(json!({"battery": 1, "electricCurrent": "invalid"})),
+        );
+
+        // Assert
+        assert!(result.is_err());
+        assert_eq!(metrics.render(), before);
+    }
+}

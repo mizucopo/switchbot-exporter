@@ -54,6 +54,7 @@ struct MockState {
     requests: Mutex<Vec<RecordedRequest>>,
     changed: Notify,
     stalled: AtomicBool,
+    stalled_path: Mutex<Option<String>>,
 }
 
 struct MockApi {
@@ -74,6 +75,7 @@ impl MockApi {
             requests: Mutex::new(Vec::new()),
             changed: Notify::new(),
             stalled: AtomicBool::new(false),
+            stalled_path: Mutex::new(None),
         });
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let url =
@@ -118,7 +120,8 @@ async fn mock_response(State(state): State<Arc<MockState>>, request: Request) ->
         headers: request.headers().clone(),
     });
     state.changed.notify_one();
-    if state.stalled.load(Ordering::Relaxed) {
+    let stalled_path = state.stalled_path.lock().unwrap().as_deref() == Some(path.as_str());
+    if state.stalled.load(Ordering::Relaxed) || stalled_path {
         std::future::pending::<()>().await;
     }
     let response = state
@@ -169,6 +172,53 @@ fn meter_devices() -> MockResponse {
 
 fn status_response(body: Value) -> MockResponse {
     MockResponse::json(json!({"statusCode": 100, "body": body}))
+}
+
+fn device_status_errors(values: &Values) -> Vec<(&'static str, MockResponse)> {
+    let private_details = format!(
+        "raw-upstream-detail: {} {}",
+        values["SWITCHBOT_API_TOKEN"], values["SWITCHBOT_API_SECRET"]
+    );
+    vec![
+        (
+            "http-503",
+            MockResponse {
+                status: StatusCode::SERVICE_UNAVAILABLE,
+                body: private_details.clone(),
+            },
+        ),
+        (
+            "api-190",
+            MockResponse::json(json!({
+                "statusCode": 190,
+                "body": {"battery": 1},
+                "message": private_details,
+            })),
+        ),
+        (
+            "invalid-json",
+            MockResponse {
+                status: StatusCode::OK,
+                body: format!("{{broken-json {private_details}"),
+            },
+        ),
+        (
+            "missing-body",
+            MockResponse::json(json!({"statusCode": 100, "message": private_details})),
+        ),
+        ("null-body", status_response(Value::Null)),
+        (
+            "invalid-metric",
+            status_response(json!({"battery": 1, "humidity": private_details})),
+        ),
+    ]
+}
+
+fn assert_no_upstream_details(body: &str, values: &Values) {
+    assert!(!body.contains(&values["SWITCHBOT_API_TOKEN"]));
+    assert!(!body.contains(&values["SWITCHBOT_API_SECRET"]));
+    assert!(!body.contains("raw-upstream-detail"));
+    assert!(!body.contains("broken-json"));
 }
 
 fn request(method: Method, path: &str) -> Request {
@@ -582,46 +632,95 @@ async fn unsuccessful_responses_are_not_cached() {
     }
 }
 
-/// 一部デバイス取得後のエラーで部分メトリクスや秘密値が公開されないこと。
-/// Arrange: 一台目が成功し二台目が各種異常を返す API が用意されること。
+/// 端末の失敗位置と種類に関係なく正常端末だけが公開されること。
+/// Arrange: 三台の先頭・中間・末尾のいずれかが各種異常を返す API が用意されること。
 /// Act: metrics endpoint が呼び出されること。
-/// Assert: HTTP 500 の固定本文だけが返されること。
+/// Assert: 残りの端末まで取得され、異常端末の全サンプルと秘密値を除いた HTTP 200 が返されること。
 #[tokio::test]
-async fn scrape_errors_return_500_without_partial_metrics_or_credentials() {
+async fn device_failures_publish_only_healthy_metrics_in_every_list_position() {
     // Arrange
     let values = configuration();
-    let secret_body = format!(
-        "{} {}",
-        values["SWITCHBOT_API_TOKEN"], values["SWITCHBOT_API_SECRET"]
-    );
-    let errors = [
-        MockResponse {
-            status: StatusCode::SERVICE_UNAVAILABLE,
-            body: secret_body.clone(),
-        },
-        MockResponse::json(json!({"statusCode": 190, "message": secret_body})),
-        MockResponse {
-            status: StatusCode::OK,
-            body: "{broken-json".to_owned(),
-        },
-        MockResponse::json(json!({"statusCode": 100})),
-        status_response(Value::Null),
-        status_response(json!({"battery": "not-numeric"})),
-    ];
-    for error in errors {
+    let ids = ["first", "middle", "last"];
+    for (kind, error) in device_status_errors(&values) {
+        for (failed_index, failed_id) in ids.iter().enumerate() {
+            let devices: Vec<_> = ids
+                .iter()
+                .map(|id| json!({"deviceId": id, "deviceType": "Meter", "deviceName": id}))
+                .collect();
+            let mut responses = vec![(
+                "/v1.1/devices".to_owned(),
+                vec![devices_response(json!(devices))],
+            )];
+            for (index, id) in ids.iter().enumerate() {
+                responses.push((
+                    format!("/v1.1/devices/{id}/status"),
+                    vec![if index == failed_index {
+                        error.clone()
+                    } else {
+                        status_response(json!({"battery": 80 + index}))
+                    }],
+                ));
+            }
+            let api = MockApi::new(responses).await;
+            let app = server::router(PathBuf::new(), Some(api.client(&values)));
+
+            // Act
+            let response = app.oneshot(request(Method::GET, "/metrics")).await.unwrap();
+            let status = response.status();
+            let content_type = response.headers()["content-type"].clone();
+            let body = response_text(response).await;
+
+            // Assert
+            let case = format!("{kind}, failed position {failed_index}");
+            assert_eq!(status, StatusCode::OK, "{case}");
+            assert_eq!(content_type, "text/plain; charset=utf-8", "{case}");
+            let samples: Vec<_> = body.lines().filter(|line| !line.starts_with('#')).collect();
+            let expected: Vec<_> = ids
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| *index != failed_index)
+                .map(|(index, id)| {
+                    format!(
+                        "switchbot_device_battery{{device_id=\"{id}\",device_name=\"{id}\"}} {}",
+                        80 + index
+                    )
+                })
+                .collect();
+            assert_eq!(samples, expected, "{case}");
+            assert!(!body.contains(&format!("device_id=\"{failed_id}\"")));
+            assert_no_upstream_details(&body, &values);
+            let paths: Vec<_> = api
+                .requests()
+                .into_iter()
+                .map(|request| request.path)
+                .collect();
+            let expected_paths: Vec<_> = std::iter::once("/v1.1/devices".to_owned())
+                .chain(ids.iter().map(|id| format!("/v1.1/devices/{id}/status")))
+                .collect();
+            assert_eq!(paths, expected_paths, "{case}");
+        }
+    }
+}
+
+/// 対象端末が全て失敗した場合にはメトリクスや秘密値が公開されないこと。
+/// Arrange: 二台の対象端末が各種異常を返す API が用意されること。
+/// Act: metrics endpoint が呼び出されること。
+/// Assert: 全端末の取得が試行され HTTP 500 の固定本文だけが返されること。
+#[tokio::test]
+async fn all_device_failures_return_500_without_metrics_or_credentials() {
+    // Arrange
+    let values = configuration();
+    for (kind, error) in device_status_errors(&values) {
         let api = MockApi::new(vec![
             (
                 "/v1.1/devices".to_owned(),
                 vec![devices_response(json!([
-                    {"deviceId": "good", "deviceType": "Meter", "deviceName": "成功"},
-                    {"deviceId": "broken", "deviceType": "Meter", "deviceName": "異常"}
+                    {"deviceId": "first", "deviceType": "Meter", "deviceName": "異常1"},
+                    {"deviceId": "second", "deviceType": "Meter", "deviceName": "異常2"}
                 ]))],
             ),
-            (
-                "/v1.1/devices/good/status".to_owned(),
-                vec![status_response(json!({"battery": 88}))],
-            ),
-            ("/v1.1/devices/broken/status".to_owned(), vec![error]),
+            ("/v1.1/devices/first/status".to_owned(), vec![error.clone()]),
+            ("/v1.1/devices/second/status".to_owned(), vec![error]),
         ])
         .await;
         let app = server::router(PathBuf::new(), Some(api.client(&values)));
@@ -632,21 +731,305 @@ async fn scrape_errors_return_500_without_partial_metrics_or_credentials() {
         let body = response_text(response).await;
 
         // Assert
-        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
-        assert_eq!(body, "Internal Server Error");
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{kind}");
+        assert_eq!(body, "Internal Server Error", "{kind}");
         assert!(!body.contains("switchbot_device_battery"));
-        assert!(!body.contains(&values["SWITCHBOT_API_TOKEN"]));
-        assert!(!body.contains(&values["SWITCHBOT_API_SECRET"]));
-        assert_eq!(api.requests().len(), 3);
+        assert_no_upstream_details(&body, &values);
+        assert_eq!(api.requests().len(), 3, "{kind}");
     }
 }
 
-/// 不正な一覧形式が空の成功応答として扱われないこと。
-/// Arrange: 必須 body・deviceList・デバイス必須項目が欠落した応答が用意されること。
+/// 認証の HTTP エラーでは正常端末があっても scrape 全体が失敗すること。
+/// Arrange: 三台の各位置で HTTP 401 または 403 を返す API が用意されること。
 /// Act: metrics endpoint が呼び出されること。
-/// Assert: status API を呼ばず HTTP 500 が返されること。
+/// Assert: 取得済みの正常サンプルや秘密値を含めず HTTP 500 の固定本文が返されること。
 #[tokio::test]
-async fn malformed_device_lists_fail_the_scrape() {
+async fn authentication_failures_reject_the_whole_scrape_after_any_partial_success() {
+    // Arrange
+    let values = configuration();
+    let ids = ["first", "middle", "last"];
+    for auth_status in [StatusCode::UNAUTHORIZED, StatusCode::FORBIDDEN] {
+        for (failed_index, _) in ids.iter().enumerate() {
+            let devices: Vec<_> = ids
+                .iter()
+                .map(|id| json!({"deviceId": id, "deviceType": "Meter", "deviceName": id}))
+                .collect();
+            let mut responses = vec![(
+                "/v1.1/devices".to_owned(),
+                vec![devices_response(json!(devices))],
+            )];
+            for (index, id) in ids.iter().enumerate() {
+                responses.push((
+                    format!("/v1.1/devices/{id}/status"),
+                    vec![if index == failed_index {
+                        MockResponse {
+                            status: auth_status,
+                            body: format!(
+                                "raw-upstream-detail: {} {}",
+                                values["SWITCHBOT_API_TOKEN"], values["SWITCHBOT_API_SECRET"]
+                            ),
+                        }
+                    } else {
+                        status_response(json!({"battery": 88}))
+                    }],
+                ));
+            }
+            let api = MockApi::new(responses).await;
+            let app = server::router(PathBuf::new(), Some(api.client(&values)));
+
+            // Act
+            let response = app.oneshot(request(Method::GET, "/metrics")).await.unwrap();
+            let status = response.status();
+            let body = response_text(response).await;
+
+            // Assert
+            assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+            assert_eq!(body, "Internal Server Error");
+            assert_no_upstream_details(&body, &values);
+            let paths: Vec<_> = api
+                .requests()
+                .into_iter()
+                .map(|request| request.path)
+                .collect();
+            let expected_prefix: Vec<_> = std::iter::once("/v1.1/devices".to_owned())
+                .chain(
+                    ids[..=failed_index]
+                        .iter()
+                        .map(|id| format!("/v1.1/devices/{id}/status")),
+                )
+                .collect();
+            assert!(paths.starts_with(&expected_prefix));
+        }
+    }
+}
+
+/// 一覧の取得エラーは正常な空一覧として扱われないこと。
+/// Arrange: HTTP・業務エラー・不正 JSON を返す一覧 API が用意されること。
+/// Act: metrics endpoint が呼び出されること。
+/// Assert: status API を呼ばず秘密値を含まない HTTP 500 の固定本文が返されること。
+#[tokio::test]
+async fn device_list_request_errors_fail_the_scrape_without_fetching_status() {
+    // Arrange
+    let values = configuration();
+    let private_details = format!(
+        "raw-upstream-detail: {} {}",
+        values["SWITCHBOT_API_TOKEN"], values["SWITCHBOT_API_SECRET"]
+    );
+    let mut errors = vec![
+        MockResponse::json(json!({"statusCode": 190, "message": private_details})),
+        MockResponse {
+            status: StatusCode::OK,
+            body: format!("{{broken-json {private_details}"),
+        },
+    ];
+    errors.extend(
+        [
+            StatusCode::SERVICE_UNAVAILABLE,
+            StatusCode::UNAUTHORIZED,
+            StatusCode::FORBIDDEN,
+        ]
+        .map(|status| MockResponse {
+            status,
+            body: private_details.clone(),
+        }),
+    );
+    for error in errors {
+        let api = MockApi::new(vec![("/v1.1/devices".to_owned(), vec![error])]).await;
+        let app = server::router(PathBuf::new(), Some(api.client(&values)));
+
+        // Act
+        let response = app.oneshot(request(Method::GET, "/metrics")).await.unwrap();
+        let status = response.status();
+        let body = response_text(response).await;
+
+        // Assert
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body, "Internal Server Error");
+        assert_no_upstream_details(&body, &values);
+        assert_eq!(api.requests().len(), 1);
+    }
+}
+
+/// 対象端末がない場合にはメトリクス定義だけが正常に公開されること。
+/// Arrange: 空一覧または対象外・種類欠落・赤外線だけの一覧が用意されること。
+/// Act: metrics endpoint が呼び出されること。
+/// Assert: status API を呼ばず七種類の HELP と TYPE だけを持つ HTTP 200 が返されること。
+#[tokio::test]
+async fn no_supported_devices_return_200_with_only_metric_definitions() {
+    // Arrange
+    for devices in [
+        json!([]),
+        json!([
+            {"deviceId": "unknown", "deviceType": "Future Device", "deviceName": "対象外"},
+            {"deviceId": "missing", "deviceName": "種類なし"},
+        ]),
+    ] {
+        let list = MockResponse::json(json!({"statusCode": 100, "body": {
+            "deviceList": devices,
+            "infraredRemoteList": [{"deviceId": "infrared", "deviceType": "Remote", "deviceName": "赤外線"}],
+        }}));
+        let api = MockApi::new(vec![("/v1.1/devices".to_owned(), vec![list])]).await;
+        let app = server::router(PathBuf::new(), Some(api.client(&configuration())));
+
+        // Act
+        let response = app.oneshot(request(Method::GET, "/metrics")).await.unwrap();
+        let status = response.status();
+        let body = response_text(response).await;
+
+        // Assert
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body.lines().count(), 14);
+        assert_eq!(
+            body.lines()
+                .filter(|line| line.starts_with("# HELP "))
+                .count(),
+            7
+        );
+        assert_eq!(
+            body.lines()
+                .filter(|line| line.starts_with("# TYPE "))
+                .count(),
+            7
+        );
+        assert!(!body.contains("device_id="));
+        assert_eq!(api.requests().len(), 1);
+    }
+}
+
+/// 取得に成功した空の status は全端末失敗として扱われないこと。
+/// Arrange: 一台が失敗し別の一台が有効な空オブジェクトを返す API が用意されること。
+/// Act: metrics endpoint が呼び出されること。
+/// Assert: サンプルがなくてもメトリクス定義だけを持つ HTTP 200 が返されること。
+#[tokio::test]
+async fn a_valid_status_without_metric_fields_counts_as_a_successful_device() {
+    // Arrange
+    let api = MockApi::new(vec![
+        (
+            "/v1.1/devices".to_owned(),
+            vec![devices_response(json!([
+                {"deviceId": "broken", "deviceType": "Meter", "deviceName": "異常"},
+                {"deviceId": "empty", "deviceType": "Meter", "deviceName": "欠測"},
+            ]))],
+        ),
+        (
+            "/v1.1/devices/broken/status".to_owned(),
+            vec![MockResponse {
+                status: StatusCode::SERVICE_UNAVAILABLE,
+                body: "upstream failure".to_owned(),
+            }],
+        ),
+        (
+            "/v1.1/devices/empty/status".to_owned(),
+            vec![status_response(json!({}))],
+        ),
+    ])
+    .await;
+    let app = server::router(PathBuf::new(), Some(api.client(&configuration())));
+
+    // Act
+    let response = app.oneshot(request(Method::GET, "/metrics")).await.unwrap();
+    let status = response.status();
+    let body = response_text(response).await;
+
+    // Assert
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body.lines().count(), 14);
+    assert_eq!(
+        body.lines()
+            .filter(|line| line.starts_with("# HELP "))
+            .count(),
+        7
+    );
+    assert_eq!(
+        body.lines()
+            .filter(|line| line.starts_with("# TYPE "))
+            .count(),
+        7
+    );
+    assert!(!body.contains("device_id="));
+    assert_eq!(api.requests().len(), 3);
+}
+
+/// 端末の失敗だけが再試行され TTL 内の正常 cache が保持されること。
+/// Arrange: 正常端末と各種失敗から次回回復する端末、および 10 秒 TTL が用意されること。
+/// Act: 部分成功の一秒後に同じ endpoint が再 scrape されること。
+/// Assert: 一覧と正常値を再取得せず、失敗端末だけが回復した HTTP 200 が返されること。
+#[tokio::test(start_paused = true)]
+async fn failed_device_statuses_are_retried_without_discarding_healthy_cache() {
+    // Arrange
+    let _clock = ControlledClock::new();
+    let mut values = configuration();
+    values.insert("CACHE_EXPIRE_SECOND".to_owned(), "10".to_owned());
+    for (kind, error) in device_status_errors(&values) {
+        let api = MockApi::new(vec![
+            (
+                "/v1.1/devices".to_owned(),
+                vec![devices_response(json!([
+                    {"deviceId": "good", "deviceType": "Meter", "deviceName": "正常"},
+                    {"deviceId": "broken", "deviceType": "Meter", "deviceName": "回復"},
+                ]))],
+            ),
+            (
+                "/v1.1/devices/good/status".to_owned(),
+                vec![
+                    status_response(json!({"battery": 88})),
+                    status_response(json!({"battery": 11})),
+                ],
+            ),
+            (
+                "/v1.1/devices/broken/status".to_owned(),
+                vec![error, status_response(json!({"battery": 77}))],
+            ),
+        ])
+        .await;
+        let app = server::router(PathBuf::new(), Some(api.client(&values)));
+        let initial = app
+            .clone()
+            .oneshot(request(Method::GET, "/metrics"))
+            .await
+            .unwrap();
+        let initial_status = initial.status();
+        let initial_body = response_text(initial).await;
+
+        // Act
+        tokio::time::advance(Duration::from_secs(1)).await;
+        let recovered = app.oneshot(request(Method::GET, "/metrics")).await.unwrap();
+        let recovered_status = recovered.status();
+        let recovered_body = response_text(recovered).await;
+
+        // Assert
+        assert_eq!(initial_status, StatusCode::OK, "{kind}");
+        assert!(initial_body.contains("device_id=\"good\",device_name=\"正常\"} 88"));
+        assert!(!initial_body.contains("device_id=\"broken\""));
+        assert_eq!(recovered_status, StatusCode::OK, "{kind}");
+        assert!(recovered_body.contains("device_id=\"good\",device_name=\"正常\"} 88"));
+        assert!(recovered_body.contains("device_id=\"broken\",device_name=\"回復\"} 77"));
+        assert_no_upstream_details(&initial_body, &values);
+        assert_no_upstream_details(&recovered_body, &values);
+        let paths: Vec<_> = api
+            .requests()
+            .into_iter()
+            .map(|request| request.path)
+            .collect();
+        assert_eq!(
+            paths,
+            [
+                "/v1.1/devices",
+                "/v1.1/devices/good/status",
+                "/v1.1/devices/broken/status",
+                "/v1.1/devices/broken/status",
+            ],
+            "{kind}"
+        );
+    }
+}
+
+/// 不正な一覧形式が成功や cache として扱われず次回に再取得されること。
+/// Arrange: 必須項目が欠落した一覧と次回の正常な空一覧が用意されること。
+/// Act: metrics endpoint が二回呼び出されること。
+/// Assert: 初回は HTTP 500、次回は一覧が再取得されメトリクス定義が返されること。
+#[tokio::test]
+async fn malformed_device_lists_fail_the_scrape_and_are_retried() {
     // Arrange
     for value in [
         json!({}),
@@ -656,18 +1039,25 @@ async fn malformed_device_lists_fail_the_scrape() {
     ] {
         let api = MockApi::new(vec![(
             "/v1.1/devices".to_owned(),
-            vec![MockResponse::json(value)],
+            vec![MockResponse::json(value), devices_response(json!([]))],
         )])
         .await;
         let app = server::router(PathBuf::new(), Some(api.client(&configuration())));
 
         // Act
-        let response = app.oneshot(request(Method::GET, "/metrics")).await.unwrap();
+        let response = app
+            .clone()
+            .oneshot(request(Method::GET, "/metrics"))
+            .await
+            .unwrap();
+        let recovered = app.oneshot(request(Method::GET, "/metrics")).await.unwrap();
 
         // Assert
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
         assert_eq!(response_text(response).await, "Internal Server Error");
-        assert_eq!(api.requests().len(), 1);
+        assert_eq!(recovered.status(), StatusCode::OK);
+        assert_eq!(response_text(recovered).await.lines().count(), 14);
+        assert_eq!(api.requests().len(), 2);
     }
 }
 
@@ -769,10 +1159,71 @@ async fn stalled_api_response_is_aborted_at_the_configured_timeout() {
     assert_eq!(api.requests().len(), 1);
 }
 
-/// cache 期限後の upstream エラーで古いメトリクスが公開されないこと。
-/// Arrange: 初回正常で次回失敗する status と 10 秒 TTL が用意されること。
-/// Act: 初回取得後に仮想時刻が期限を超え、再 scrape されること。
-/// Assert: 再取得が試行され HTTP 500 が返り古い値が含まれないこと。
+/// 先頭端末の timeout 後にも次の正常端末のメトリクスが公開されること。
+/// Arrange: 応答しない先頭端末と正常な次端末、および 2 秒 timeout が用意されること。
+/// Act: status の取得中に仮想時刻が timeout まで進められること。
+/// Assert: 次端末まで取得され、停止した端末と秘密値を除いた HTTP 200 が返されること。
+#[tokio::test(start_paused = true)]
+async fn a_timed_out_device_does_not_prevent_later_device_metrics() {
+    // Arrange
+    let _clock = ControlledClock::new();
+    let mut values = configuration();
+    values.insert("API_TIMEOUT_SECOND".to_owned(), "2".to_owned());
+    let api = MockApi::new(vec![
+        (
+            "/v1.1/devices".to_owned(),
+            vec![devices_response(json!([
+                {"deviceId": "stalled", "deviceType": "Meter", "deviceName": "停止"},
+                {"deviceId": "good", "deviceType": "Meter", "deviceName": "正常"},
+            ]))],
+        ),
+        (
+            "/v1.1/devices/good/status".to_owned(),
+            vec![status_response(json!({"battery": 88}))],
+        ),
+    ])
+    .await;
+    *api.state.stalled_path.lock().unwrap() = Some("/v1.1/devices/stalled/status".to_owned());
+    let app = server::router(PathBuf::new(), Some(api.client(&values)));
+    let pending = tokio::spawn(app.oneshot(request(Method::GET, "/metrics")));
+    api.wait_for_requests(2).await;
+
+    // Act
+    let before_timeout = !pending.is_finished();
+    tokio::time::advance(Duration::from_secs(2)).await;
+    let response = pending.await.unwrap().unwrap();
+    let status = response.status();
+    let body = response_text(response).await;
+
+    // Assert
+    assert!(before_timeout);
+    assert_eq!(status, StatusCode::OK);
+    let samples: Vec<_> = body.lines().filter(|line| !line.starts_with('#')).collect();
+    assert_eq!(
+        samples,
+        ["switchbot_device_battery{device_id=\"good\",device_name=\"正常\"} 88",]
+    );
+    assert!(!body.contains("device_id=\"stalled\""));
+    assert_no_upstream_details(&body, &values);
+    let paths: Vec<_> = api
+        .requests()
+        .into_iter()
+        .map(|request| request.path)
+        .collect();
+    assert_eq!(
+        paths,
+        [
+            "/v1.1/devices",
+            "/v1.1/devices/stalled/status",
+            "/v1.1/devices/good/status",
+        ]
+    );
+}
+
+/// cache 期限後の全端末失敗で古いメトリクスが公開されず再試行できること。
+/// Arrange: 初回正常・期限後失敗・次回回復の status と 10 秒 TTL が用意されること。
+/// Act: 仮想時刻が期限を超えてから失敗時と回復時に再 scrape されること。
+/// Assert: 全端末失敗では固定本文の HTTP 500 が返り、再試行時に新しい値だけが返されること。
 #[tokio::test(start_paused = true)]
 async fn expired_cache_does_not_mask_an_upstream_failure() {
     // Arrange
@@ -789,6 +1240,7 @@ async fn expired_cache_does_not_mask_an_upstream_failure() {
                     status: StatusCode::SERVICE_UNAVAILABLE,
                     body: "unavailable".to_owned(),
                 },
+                status_response(json!({"battery": 70})),
             ],
         ),
     ])
@@ -799,14 +1251,135 @@ async fn expired_cache_does_not_mask_an_upstream_failure() {
 
     // Act
     tokio::time::advance(Duration::from_secs(11)).await;
-    let response = app.oneshot(request(Method::GET, "/metrics")).await.unwrap();
+    let response = app
+        .clone()
+        .oneshot(request(Method::GET, "/metrics"))
+        .await
+        .unwrap();
     let status = response.status();
     let body = response_text(response).await;
+    let requests_after_failure = api.requests().len();
+    let recovered = app.oneshot(request(Method::GET, "/metrics")).await.unwrap();
+    let recovered_status = recovered.status();
+    let recovered_body = response_text(recovered).await;
 
     // Assert
     assert!(initial.contains("device_name=\"居間\"} 88"));
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
     assert_eq!(body, "Internal Server Error");
     assert!(!body.contains("switchbot_device_battery"));
-    assert_eq!(api.requests().len(), 4);
+    assert_eq!(requests_after_failure, 4);
+    assert_eq!(recovered_status, StatusCode::OK);
+    assert!(recovered_body.contains("device_name=\"居間\"} 70"));
+    assert!(!recovered_body.contains("device_name=\"居間\"} 88"));
+    assert_eq!(api.requests().len(), 5);
+}
+
+/// cache 期限後の失敗端末には古い値で補完せず、正常値と回復した値だけが公開されること。
+/// Arrange: 二台の初回正常値と、一台の期限後の各種失敗・回復が用意されること。
+/// Act: 10 秒 TTL を超えて部分成功が取得され、直後に同じ endpoint が再 scrape されること。
+/// Assert: 失敗端末の古い全サンプルが省かれ、正常 cache を保った再試行で新しい値が返されること。
+#[tokio::test(start_paused = true)]
+async fn expired_device_failures_omit_stale_samples_and_retry_without_refetching_healthy_cache() {
+    // Arrange
+    let _clock = ControlledClock::new();
+    let mut values = configuration();
+    values.insert("CACHE_EXPIRE_SECOND".to_owned(), "10".to_owned());
+    for (kind, error) in device_status_errors(&values) {
+        let api = MockApi::new(vec![
+            (
+                "/v1.1/devices".to_owned(),
+                vec![devices_response(json!([
+                    {"deviceId": "good", "deviceType": "Meter", "deviceName": "正常"},
+                    {"deviceId": "broken", "deviceType": "Meter", "deviceName": "回復"},
+                ]))],
+            ),
+            (
+                "/v1.1/devices/good/status".to_owned(),
+                vec![
+                    status_response(json!({"battery": 88})),
+                    status_response(json!({"battery": 90})),
+                    status_response(json!({"battery": 11})),
+                ],
+            ),
+            (
+                "/v1.1/devices/broken/status".to_owned(),
+                vec![
+                    status_response(json!({"battery": 66, "humidity": 50})),
+                    error,
+                    status_response(json!({"battery": 77})),
+                ],
+            ),
+        ])
+        .await;
+        let app = server::router(PathBuf::new(), Some(api.client(&values)));
+        let initial = app
+            .clone()
+            .oneshot(request(Method::GET, "/metrics"))
+            .await
+            .unwrap();
+        let initial_status = initial.status();
+        let initial_body = response_text(initial).await;
+
+        // Act
+        tokio::time::advance(Duration::from_secs(11)).await;
+        let partial = app
+            .clone()
+            .oneshot(request(Method::GET, "/metrics"))
+            .await
+            .unwrap();
+        let partial_status = partial.status();
+        let partial_body = response_text(partial).await;
+        let recovered = app.oneshot(request(Method::GET, "/metrics")).await.unwrap();
+        let recovered_status = recovered.status();
+        let recovered_body = response_text(recovered).await;
+
+        // Assert
+        assert_eq!(initial_status, StatusCode::OK, "{kind}");
+        assert!(initial_body.contains("device_id=\"good\",device_name=\"正常\"} 88"));
+        assert!(initial_body.contains("device_id=\"broken\",device_name=\"回復\"} 66"));
+        assert_eq!(partial_status, StatusCode::OK, "{kind}");
+        let partial_samples: Vec<_> = partial_body
+            .lines()
+            .filter(|line| !line.starts_with('#'))
+            .collect();
+        assert_eq!(
+            partial_samples,
+            ["switchbot_device_battery{device_id=\"good\",device_name=\"正常\"} 90",],
+            "{kind}"
+        );
+        assert_eq!(recovered_status, StatusCode::OK, "{kind}");
+        let recovered_samples: Vec<_> = recovered_body
+            .lines()
+            .filter(|line| !line.starts_with('#'))
+            .collect();
+        assert_eq!(
+            recovered_samples,
+            [
+                "switchbot_device_battery{device_id=\"good\",device_name=\"正常\"} 90",
+                "switchbot_device_battery{device_id=\"broken\",device_name=\"回復\"} 77",
+            ],
+            "{kind}"
+        );
+        assert_no_upstream_details(&partial_body, &values);
+        assert_no_upstream_details(&recovered_body, &values);
+        let paths: Vec<_> = api
+            .requests()
+            .into_iter()
+            .map(|request| request.path)
+            .collect();
+        assert_eq!(
+            paths,
+            [
+                "/v1.1/devices",
+                "/v1.1/devices/good/status",
+                "/v1.1/devices/broken/status",
+                "/v1.1/devices",
+                "/v1.1/devices/good/status",
+                "/v1.1/devices/broken/status",
+                "/v1.1/devices/broken/status",
+            ],
+            "{kind}"
+        );
+    }
 }
