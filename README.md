@@ -63,11 +63,11 @@ cargo build --release --locked
 
 Rust テストはローカル HTTP mock と仮想時計で API 認証・取得・TTL・待機・エラー・HTTP route を確認します。実機 SwitchBot の操作や性能計測は行いません。
 native PR CI と Release の各対象runnerでは共通controllerのarchive・SHA-256・展開済み実行ファイルに加え、ローカルTLS/proxy mockによる設定読込・既存メトリクス・cache・エラー・timeout・処理中のscrapeを含む正常終了を確認します。Windows ARM64とmacOS ARM64もnative実行し、クロスビルドだけの確認とは区別します。
-Rust 品質チェックと採番・公開は repo-template の生成物を使用します。共通 controller の回帰テストは repo-template 側で管理します。製品固有の配布検証は `.github/scripts/release_smoke.py` で行います。
+Rust 品質チェックと採番・公開は repo-template の生成物を使用します。version source は `Cargo.toml`、追随する lockfile は `Cargo.lock` とし、[配布設定](.github/release.json)で宣言します。共通 controller の回帰テストは repo-template 側で管理します。製品固有の配布検証は `.github/scripts/release_smoke.py` で行います。
 
-Docker は Alpine Linux / musl を使い、`linux/amd64` と `linux/arm64` に対応します。CA証明書と `Asia/Tokyo` のtimezone dataを含みます。[Alpine 採用の判断](docs/adr/0002-alpine-runtime.md)と検証範囲を記録しています。
+Docker は builder と runtime の両方で Alpine Linux / musl を使い、`linux/amd64` と `linux/arm64` に対応します。Rust と Alpine のタグは [Dockerfile](Dockerfile) で管理します。builder は rustls の暗号処理に使う AWS-LC のために C/C++ ビルドツールを含みます。runtime は CA 証明書と timezone data を含み、`Asia/Tokyo`、作業ディレクトリ `/app`、既定 CMD `switchbot-exporter exporter` を設定します。
 
-PR CI は両方の native runner で、外部ネットワークを無効にしたmusl版の統合テストとruntime imageのsmokeを実行します。統合テストはローカルHTTPS・独自CA・proxyも確認します。ビルド用ツールとテスト用fixtureは配布imageには含みません。
+PR CI は両方の native runner で、外部ネットワークを無効にしたmusl版の統合テストとruntime imageのsmokeを実行します。統合テストはローカルHTTPS・独自CA・proxyも確認します。runtime smoke は BusyBox の sh / nc を使います。ビルド用ツールとテスト用fixtureは配布imageには含みません。
 
 ```sh
 docker build --check .
@@ -77,7 +77,7 @@ docker run --rm --network none switchbot-exporter:develop switchbot-exporter --v
 bash tests/docker_smoke.sh switchbot-exporter:develop
 ```
 
-リリース分類は [CONTRIBUTING.md](CONTRIBUTING.md)、採番・公開は [docs/release.md](docs/release.md)、実装判断は [ADR](docs/adr/0001-rust-exporter.md) を参照してください。
+リリース分類は [CONTRIBUTING.md](CONTRIBUTING.md)、採番・公開は [docs/release.md](docs/release.md) を参照してください。
 
 ## Contact
 
