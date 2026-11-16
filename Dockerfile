@@ -1,5 +1,5 @@
 # ビルドステージ
-FROM rust:1.99-alpine3.23 AS builder
+FROM rust:1.100-alpine3.23 AS builder
 
 RUN apk add --no-cache build-base
 
