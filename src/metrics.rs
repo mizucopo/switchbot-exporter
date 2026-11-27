@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use std::{array, collections::HashMap};
 
 use anyhow::{Result, bail};
 use serde_json::{Map, Value};
 
 use crate::switchbot::Device;
 
-const FAMILIES: [(&str, &str, &str); 7] = [
+const FAMILIES: &[(&str, &str, &str)] = &[
     ("battery", "battery", "Battery level"),
     ("humidity", "humidity", "Humidity"),
     ("temperature", "temperature", "Temperature"),
@@ -15,16 +15,24 @@ const FAMILIES: [(&str, &str, &str); 7] = [
     ("electricCurrent", "electric_current", "ElectricCurrent"),
 ];
 
-#[derive(Default)]
 pub struct Metrics {
     names: HashMap<String, String>,
-    samples: [Vec<(String, String)>; 7],
+    samples: [Vec<(String, String)>; FAMILIES.len()],
+}
+
+impl Default for Metrics {
+    fn default() -> Self {
+        Self {
+            names: HashMap::new(),
+            samples: array::from_fn(|_| Vec::new()),
+        }
+    }
 }
 
 impl Metrics {
     pub fn add(&mut self, device: &Device, status: &Map<String, Value>) -> Result<()> {
         // 端末の全項目を検証してから追加し、不正端末の一部だけを公開しない。
-        for (key, _, _) in FAMILIES {
+        for &(key, _, _) in FAMILIES {
             if let Some(value) = status.get(key)
                 && !value.is_number()
             {
